@@ -1734,15 +1734,17 @@ export default function IdleRPG() {
 
       {/* HEADER */}
       <header style={S.header}>
-        <div>
-          <div style={S.logo}>⚔ IDLE CRUSADE</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-            <span style={S.subtitle}>Eclipse Year III · Zone {zone}</span>
-            {activePath && (
-              <span style={{ fontSize: 9, fontWeight: "bold", letterSpacing: 1, padding: "1px 6px", borderRadius: 4, border: `1px solid ${activePath.color}88`, background: activePath.color + "22", color: activePath.color }}>
-                {activePath.emoji} {activePath.name.replace("The ", "")}
-              </span>
-            )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <img src={LOGO_IMG} alt="Eclipse Legends" style={{ height: 44, width: 44, borderRadius: 8, objectFit: "cover", flexShrink: 0, boxShadow: "0 0 12px #a855f744" }} />
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={S.subtitle}>Eclipse Year III · Zone {zone}</span>
+              {activePath && (
+                <span style={{ fontSize: 9, fontWeight: "bold", letterSpacing: 1, padding: "1px 6px", borderRadius: 4, border: `1px solid ${activePath.color}88`, background: activePath.color + "22", color: activePath.color }}>
+                  {activePath.emoji} {activePath.name.replace("The ", "")}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <div style={S.goldPill}>🪙 <span style={S.goldNum}>{fmt(gold)}</span></div>
