@@ -48,7 +48,7 @@ const BOSSES = [
   {
     zone: 10,
     name: "Slime King",
-    image: "/bosses/slime.png",
+    image: "/bosses/slime_king.png",
     bgm: "boss-theme.mp3",
   },
   {
