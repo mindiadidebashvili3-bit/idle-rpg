@@ -65,7 +65,7 @@ const BOSSES = [
     zone: 19,
     name: "Goblin Warchief",
     emoji: "⚔️",
-    image: "/bosses/goblin.png",
+    image: "/bosses/warchief.gif",
     idleAnim: "shake",
     bgm: "boss-theme.mp3",
     regionName: "Goblin Crags",
@@ -78,7 +78,7 @@ const BOSSES = [
     zone: 29,
     name: "Catacomb Lord",
     emoji: "💀",
-    image: "/bosses/skeleton.png",
+    image: "/bosses/catacomb_lord.gif",
     idleAnim: "float",
     bgm: "boss-theme.mp3",
     regionName: "The Forgotten Catacombs",
@@ -91,7 +91,7 @@ const BOSSES = [
     zone: 39,
     name: "Orc Warlord",
     emoji: "🏴",
-    image: "/bosses/the hollow beast.png",
+    image: "/bosses/orc_warlord.gif",
     idleAnim: "shake",
     bgm: "boss-theme.mp3",
     regionName: "Orcish Wastes",
@@ -104,7 +104,7 @@ const BOSSES = [
     zone: 49,
     name: "Troll Shaman King",
     emoji: "🌿",
-    image: "/bosses/troll.png",
+    image: "/bosses/troll_shaman.gif",
     idleAnim: "float",
     bgm: "boss-theme.mp3",
     regionName: "The Troll Marshes",
@@ -117,7 +117,7 @@ const BOSSES = [
     zone: 59,
     name: "Pale Commander",
     emoji: "🛡️",
-    image: "/bosses/dark knight.png",
+    image: "/bosses/pale_commander.gif",
     idleAnim: "float",
     bgm: "boss-theme.mp3",
     regionName: "Citadel Approach",
@@ -130,7 +130,7 @@ const BOSSES = [
     zone: 69,
     name: "Corrupted Dragon",
     emoji: "🐉",
-    image: "/bosses/dragon.png",
+    image: "/bosses/corrupted_dragon.gif",
     idleAnim: "dragonHover",
     bgm: "boss-theme.mp3",
     regionName: "The Dragon Highlands",
@@ -143,7 +143,7 @@ const BOSSES = [
     zone: 99,
     name: "Eclipse Emperor",
     emoji: "🌑",
-    image: "/bosses/eclips emperor.png",
+    image: "/bosses/eclipse emperor.png",
     idleAnim: "dragonHover",
     bgm: "final-boss.mp3",
     regionName: "The Obsidian Citadel",
@@ -159,6 +159,13 @@ const BOSS_ZONES = new Set(BOSSES.map(b => b.zone));
 
 // Retreat / Exhaustion system
 // Time the player has to kill a normal enemy before retreating (scales with zone)
+const EXHAUSTION_DURATION = 8000; // ms the player is locked out after a failed retreat
+
+function getEnemyKillWindow(zone) {
+  // Starts at 15 s at zone 1, shrinks by 80 ms per zone, bottoms out at 4 s
+  return Math.max(4000, 15000 - zone * 80);
+}
+
 const ENEMIES = [
   {
     id: "slime",
@@ -170,6 +177,17 @@ const ENEMIES = [
     baseHp: 20,
     baseGold: 3,
     zone: 1,
+  },
+  {
+    id: "wolf",
+    name: "Wolf",
+    enemyKey: "wolf",
+    emoji: "🐺",
+    image: "/monsters/wolf.png",
+    idleAnim: "shake",
+    baseHp: 40,
+    baseGold: 6,
+    zone: 2,
   },
   {
     id: "goblin",
@@ -192,6 +210,17 @@ const ENEMIES = [
     baseHp: 150,
     baseGold: 18,
     zone: 3,
+  },
+  {
+    id: "bat",
+    name: "Bat",
+    enemyKey: "bat",
+    emoji: "🦇",
+    image: "/monsters/bat.png",
+    idleAnim: "float",
+    baseHp: 200,
+    baseGold: 24,
+    zone: 4,
   },
   {
     id: "orc",
@@ -220,7 +249,7 @@ const ENEMIES = [
     name: "Dark Knight",
     enemyKey: "knight",
     emoji: "🛡️",
-    image: "/monsters/knight.png",
+    image: "/monsters/dark knight.png",
     idleAnim: "float",
     baseHp: 2000,
     baseGold: 220,
@@ -231,7 +260,7 @@ const ENEMIES = [
     name: "Dragon",
     enemyKey: "dragon",
     emoji: "🐉",
-    image: "/monsters/dragon.gif",
+    image: "/monsters/dragon.png",
     idleAnim: "dragonHover",
     baseHp: 6000,
     baseGold: 600,
@@ -280,6 +309,17 @@ const ENEMIES = [
     baseHp: 400000,
     baseGold: 40000,
     zone: 22,
+  },
+  {
+    id: "hollow_beast",
+    name: "The Hollow Beast",
+    enemyKey: "hollow_beast",
+    emoji: "👁️",
+    image: "/monsters/the hollow beast.png",
+    idleAnim: "dragonHover",
+    baseHp: 800000,
+    baseGold: 80000,
+    zone: 28,
   },
   {
     id: "void_wraith",
