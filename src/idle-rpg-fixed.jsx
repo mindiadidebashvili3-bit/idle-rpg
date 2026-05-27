@@ -1,8 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
-// ── GAME DATA ──────────────────────────────────────────────────────────
-// All static game configuration. Tweak numbers, descriptions, and scaling
-// here without touching any rendering or game logic code.
 
 // ── DATA ────────────────────────────────────────────────────────────────────
 
@@ -343,7 +340,7 @@ const ENEMIES_BY_ZONE = [...ENEMIES].sort((a, b) => b.zone - a.zone);
 const HEROES = [
   // acquisition: { kind: 'start' | 'shop' | 'chest' | 'realmoney', note: string }
   // passive: { type: 'dmgMult'|'goldMult'|'cdReduce'|'clickAdd'|'dpsAdd', value: number }
-  { id: "squire",   rarity: "Common",    name: "Squire",       emoji: "🧑‍⚔️", baseDps: 100000000000,    baseCost: 15,    costMult: 1.15, lore: "A farmboy who survived the first eclipse. He fights because nobody else will.", acquisition: { kind: "start", note: "You begin with him." }, passive: { type: "clickAdd", value: 1 } },
+  { id: "squire",   rarity: "Common",    name: "Squire",       emoji: "🧑‍⚔️", baseDps: 1,    baseCost: 15,    costMult: 1.15, lore: "A farmboy who survived the first eclipse. He fights because nobody else will.", acquisition: { kind: "start", note: "You begin with him." }, passive: { type: "clickAdd", value: 1 } },
   { id: "archer",   rarity: "Common",    name: "Archer",       emoji: "🏹",  baseDps: 5,    baseCost: 100,   costMult: 1.15, lore: "Her forest was swallowed by darkness. She shoots arrows toward a horizon she can't see.", acquisition: { kind: "chest", note: "Drops from Goblin Crags chests." }, passive: { type: "dmgMult", value: 0.05 } },
   { id: "mage",     rarity: "Rare",      name: "Mage",         emoji: "🧙",  baseDps: 20,   baseCost: 500,   costMult: 1.15, lore: "Refused to flee when the eclipse came. His tower is rubble, but his spells survive.", acquisition: { kind: "shop", note: "Available after unlocking Mage training." }, passive: { type: "cdReduce", value: 0.02 } },
   { id: "paladin",  rarity: "Rare",      name: "Paladin",      emoji: "⚔️",  baseDps: 80,   baseCost: 2000,  costMult: 1.15, lore: "One of the last who refused the Lich's offer of immortality. He fights as penance.", acquisition: { kind: "realmoney", note: "Limited Relic Store offer." }, passive: { type: "goldMult", value: 0.05 } },
@@ -616,6 +613,153 @@ const ABILITIES = [
   { id: "battlecry", name: "Battle Cry",emoji: "📯", desc: "2× all dmg",   duration: 5000,  cooldown: 30000, color: "#f5c518" },
   { id: "goldrush",  name: "Gold Rush", emoji: "✨", desc: "2× gold drops", duration: 10000, cooldown: 60000, color: "#44cc88" },
 ];
+
+// ── PET SYSTEM ────────────────────────────────────────────────────────────────
+// Pets persist across Rebirths (unlike heroes / companions).
+// Only one pet can be active at a time. Each has a unique passive type:
+//   dpsMult   → multiplies idle DPS
+//   critMult  → adds to weak-point crit damage multiplier
+//   goldTick  → auto-collects gold every 3s based on enemy gold reward
+//   killGold  → bonus % gold on every kill
+
+const PETS = [
+  {
+    id: "baby_dragon",
+    name: "Baby Dragon",
+    emoji: "🐉",
+    unlockZone: 10,
+    unlockCost: 5000,
+    unlockCurrency: "gold",
+    type: "dpsMult",
+    lore: "A hatchling that hid in your shadow when the Eclipse fell. It breathes tiny flames — but it is learning.",
+    color: "#ff6622",
+    tiers: [
+      { level: 0, name: "Hatchling",  emoji: "🥚", bonus: 0.15, desc: "+15% Idle DPS",  evolveCost: 40,  evolveCurrency: "voidDust" },
+      { level: 1, name: "Whelpling",  emoji: "🐉", bonus: 0.35, desc: "+35% Idle DPS",  evolveCost: 120, evolveCurrency: "voidDust" },
+      { level: 2, name: "Drake",      emoji: "🔥", bonus: 0.70, desc: "+70% Idle DPS",  evolveCost: null },
+    ],
+  },
+  {
+    id: "ghost_wolf",
+    name: "Ghost Wolf",
+    emoji: "🐺",
+    unlockZone: 20,
+    unlockCost: 30000,
+    unlockCurrency: "gold",
+    type: "critMult",
+    lore: "Slain on the first night of the Eclipse, it haunts your path — sniffing out every weakness in your enemies.",
+    color: "#88aaff",
+    tiers: [
+      { level: 0, name: "Phantom Pup",  emoji: "🐾", bonus: 1,   desc: "+1× Crit Damage",  evolveCost: 60,  evolveCurrency: "voidDust" },
+      { level: 1, name: "Ghost Wolf",   emoji: "🐺", bonus: 2,   desc: "+2× Crit Damage",  evolveCost: 180, evolveCurrency: "voidDust" },
+      { level: 2, name: "Spirit Alpha", emoji: "🌀", bonus: 4,   desc: "+4× Crit Damage",  evolveCost: null },
+    ],
+  },
+  {
+    id: "slime_mini",
+    name: "Slime King Mini",
+    emoji: "👑",
+    unlockZone: 30,
+    unlockCost: 80,
+    unlockCurrency: "voidDust",
+    type: "goldTick",
+    lore: "A fragment of the defeated Slime King, still loyal to the concept of gold. It rolls the battlefield and brings back coins.",
+    color: "#44cc88",
+    tiers: [
+      { level: 0, name: "Slimeling",    emoji: "🟢", bonus: 0.5,  desc: "Collect 0.5× enemy gold / 3s",  evolveCost: 80,  evolveCurrency: "voidDust" },
+      { level: 1, name: "Slime Prince", emoji: "💧", bonus: 1.5,  desc: "Collect 1.5× enemy gold / 3s",  evolveCost: 240, evolveCurrency: "voidDust" },
+      { level: 2, name: "Slime Regent", emoji: "👑", bonus: 3.0,  desc: "Collect 3× enemy gold / 3s",    evolveCost: null },
+    ],
+  },
+  {
+    id: "phoenix",
+    name: "Phoenix",
+    emoji: "🔥",
+    unlockZone: 50,
+    unlockCost: 3,
+    unlockCurrency: "soulCrystals",
+    type: "killGold",
+    lore: "A being that understands Rebirth better than you do. Each enemy it claims burns clean — and their gold multiplies.",
+    color: "#ffaa22",
+    tiers: [
+      { level: 0, name: "Ember",      emoji: "✨", bonus: 0.30, desc: "+30% Gold per kill",  evolveCost: 100, evolveCurrency: "voidDust" },
+      { level: 1, name: "Flamewing",  emoji: "🔥", bonus: 0.75, desc: "+75% Gold per kill",  evolveCost: 300, evolveCurrency: "voidDust" },
+      { level: 2, name: "Reborn Sun", emoji: "🌟", bonus: 1.50, desc: "+150% Gold per kill", evolveCost: null },
+    ],
+  },
+];
+
+// ── GACHA SYSTEM ─────────────────────────────────────────────────────────────
+// Currency: Eclipse Shards 🌑 — earned from boss kills & zone milestones
+
+const GACHA_PULL_COST   = 100;  // shards per single pull
+const GACHA_PITY_RARE   = 10;   // guaranteed Rare+ every N pulls (per banner)
+const GACHA_PITY_LEGEND = 50;   // guaranteed Legendary every N pulls (pity system)
+
+function getBossShardReward(zone) {
+  if (zone >= 69) return 25;
+  if (zone >= 49) return 18;
+  if (zone >= 29) return 12;
+  if (zone >= 19) return 8;
+  return 5;
+}
+
+// Hero banner — pools from existing HEROES by rarity tier
+const HERO_BANNER_POOL = [
+  { id: "squire",   rarity: "Common" },
+  { id: "archer",   rarity: "Common" },
+  { id: "mage",     rarity: "Rare" },
+  { id: "paladin",  rarity: "Rare" },
+  { id: "assassin", rarity: "Epic" },
+  { id: "dragon",   rarity: "Epic" },
+  { id: "titan",    rarity: "Legendary" },
+  { id: "seraph",   rarity: "Legendary" },
+];
+
+// Spirit Egg banner — unique gacha-only pets (flat bonus, no evolution tiers)
+// These integrate directly with the existing petOwned/activePet system.
+const SPIRIT_EGG_POOL = [
+  // Common (70%)
+  { id:"void_sprite",     name:"Void Sprite",      emoji:"💜", rarity:"Common",    color:"#9966cc", type:"dpsMult",   bonus:0.05, desc:"+5% Idle DPS",      lore:"A fragment of the void, too small to be dangerous, too stubborn to disappear." },
+  { id:"ember_fox",       name:"Ember Fox",        emoji:"🦊", rarity:"Common",    color:"#ff7733", type:"killGold",  bonus:0.10, desc:"+10% Kill Gold",    lore:"A creature of old fire. Drawn to the smell of coin left after a battle." },
+  { id:"dusty_crab",      name:"Dusty Crab",       emoji:"🦀", rarity:"Common",    color:"#cc8844", type:"goldTick",  bonus:0.20, desc:"+0.2× Gold/3s",     lore:"Scavenges the battlefield for dropped coin. Slow, methodical, tireless." },
+  { id:"moss_toad",       name:"Moss Toad",        emoji:"🐸", rarity:"Common",    color:"#55aa44", type:"dpsMult",   bonus:0.04, desc:"+4% Idle DPS",       lore:"Absorbs residual hero energy and croaks it back as bonus damage." },
+  // Rare (20%)
+  { id:"storm_sprite",    name:"Storm Sprite",     emoji:"⚡", rarity:"Rare",      color:"#88ccff", type:"critMult",  bonus:0.5,  desc:"+0.5× Crit Dmg",   lore:"Born from a lightning strike that hit an eclipse wound. It hunts weak points." },
+  { id:"shadow_lynx",     name:"Shadow Lynx",      emoji:"🐱", rarity:"Rare",      color:"#8855bb", type:"killGold",  bonus:0.20, desc:"+20% Kill Gold",    lore:"Slips in after every kill and pockets something. You never see it happen." },
+  { id:"frost_owl",       name:"Frost Owl",        emoji:"🦉", rarity:"Rare",      color:"#aaddff", type:"dpsMult",   bonus:0.12, desc:"+12% Idle DPS",     lore:"Its presence cools the air. Heroes breathe easier, fight longer." },
+  // Epic (8%)
+  { id:"crystal_serpent", name:"Crystal Serpent",  emoji:"🐍", rarity:"Epic",      color:"#44ccaa", type:"dpsMult",   bonus:0.30, desc:"+30% Idle DPS",     lore:"Each scale refracts eclipse-light back as pure damage. Ancient. Patient." },
+  { id:"void_reaper",     name:"Void Reaper",      emoji:"💀", rarity:"Epic",      color:"#cc44ff", type:"critMult",  bonus:1.5,  desc:"+1.5× Crit Dmg",   lore:"Exists only in the moment a weak point breaks. It feeds on the gap." },
+  { id:"magma_salamander",name:"Magma Salamander", emoji:"🦎", rarity:"Epic",      color:"#ff5522", type:"goldTick",  bonus:1.20, desc:"+1.2× Gold/3s",     lore:"Tunnels between fights, surfacing with whatever it found down there." },
+  // Legendary (2%)
+  { id:"astral_dragon",   name:"Astral Dragon",    emoji:"🐲", rarity:"Legendary", color:"#f5c518", type:"dpsMult",   bonus:1.00, desc:"+100% Idle DPS",    lore:"A dragon that shed its body in the last eclipse and chose to stay." },
+  { id:"eclipse_wolf",    name:"Eclipse Wolf",     emoji:"🌑", rarity:"Legendary", color:"#cc88ff", type:"killGold",  bonus:0.60, desc:"+60% Kill Gold",    lore:"The wolf the Eclipse sent ahead. It chose you instead. That is everything." },
+];
+
+// Roll rarity given pity counter (pulls since last legendary)
+function rollGachaRarity(pityCount, mode = "normal") {
+  if (pityCount >= GACHA_PITY_LEGEND)                           return "Legendary";
+  if (pityCount >= GACHA_PITY_RARE  && mode !== "already_rare") return rollRarityMinRare();
+  const r = Math.random();
+  if (r < 0.02) return "Legendary";
+  if (r < 0.10) return "Epic";
+  if (r < 0.30) return "Rare";
+  return "Common";
+}
+function rollRarityMinRare() {
+  const r = Math.random();
+  if (r < 0.08) return "Legendary";
+  if (r < 0.32) return "Epic";
+  return "Rare";
+}
+
+// Perform a single roll on a pool; returns pool item
+function drawFromPool(pool, rarity) {
+  const candidates = pool.filter(p => p.rarity === rarity);
+  if (candidates.length === 0) return pool[0]; // fallback
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
 
 // Rebirth milestone unlocks — permanent perks earned on specific rebirth counts
 const REBIRTH_MILESTONES = [
@@ -953,26 +1097,164 @@ function getItemRarity(bonus) {
   return "Common";
 }
 
+// ── WEAPON EVOLUTION CHAINS ─────────────────────────────────────────────────
+// Each weapon type has a 4-tier evolution: evolve when item reaches ★5
+// Evolving costs Void Dust and transforms the item into the next tier.
+const WEAPON_CHAINS = {
+  Sword:  [
+    { name: "Iron Sword",    emoji: "🗡️", rarity: "Common",    bonusBase: 8  },
+    { name: "Flame Sword",   emoji: "🔥", rarity: "Rare",      bonusBase: 18 },
+    { name: "Void Sword",    emoji: "⚔️", rarity: "Epic",      bonusBase: 32 },
+    { name: "Eclipse Blade", emoji: "🌑", rarity: "Legendary", bonusBase: 55 },
+  ],
+  Armor:  [
+    { name: "Iron Mail",       emoji: "🛡️", rarity: "Common",    bonusBase: 8  },
+    { name: "Flame Plate",     emoji: "🔥", rarity: "Rare",      bonusBase: 18 },
+    { name: "Void Carapace",   emoji: "💠", rarity: "Epic",      bonusBase: 32 },
+    { name: "Eclipse Aegis",   emoji: "🌑", rarity: "Legendary", bonusBase: 55 },
+  ],
+  Helmet: [
+    { name: "Iron Helm",       emoji: "⛑️", rarity: "Common",    bonusBase: 7  },
+    { name: "Spectral Visor",  emoji: "👁️", rarity: "Rare",      bonusBase: 16 },
+    { name: "Void Crown",      emoji: "💜", rarity: "Epic",      bonusBase: 30 },
+    { name: "Eclipse Circlet", emoji: "🌑", rarity: "Legendary", bonusBase: 52 },
+  ],
+  Ring:   [
+    { name: "Copper Band",     emoji: "💍", rarity: "Common",    bonusBase: 6  },
+    { name: "Arcane Ring",     emoji: "💎", rarity: "Rare",      bonusBase: 14 },
+    { name: "Void Loop",       emoji: "🔮", rarity: "Epic",      bonusBase: 28 },
+    { name: "Eclipse Sigil",   emoji: "🌑", rarity: "Legendary", bonusBase: 50 },
+  ],
+  Amulet: [
+    { name: "Bone Charm",      emoji: "📿", rarity: "Common",    bonusBase: 6  },
+    { name: "Blazing Pendant", emoji: "🔮", rarity: "Rare",      bonusBase: 14 },
+    { name: "Void Talisman",   emoji: "💜", rarity: "Epic",      bonusBase: 28 },
+    { name: "Eclipse Amulet",  emoji: "🌑", rarity: "Legendary", bonusBase: 50 },
+  ],
+  Gloves: [
+    { name: "Leather Wraps",   emoji: "🧤", rarity: "Common",    bonusBase: 7  },
+    { name: "Cursed Gauntlets",emoji: "🔥", rarity: "Rare",      bonusBase: 15 },
+    { name: "Void Claws",      emoji: "💠", rarity: "Epic",      bonusBase: 28 },
+    { name: "Eclipse Fists",   emoji: "🌑", rarity: "Legendary", bonusBase: 50 },
+  ],
+  Boots:  [
+    { name: "Worn Boots",      emoji: "👢", rarity: "Common",    bonusBase: 7  },
+    { name: "Spectral Treads", emoji: "🌀", rarity: "Rare",      bonusBase: 15 },
+    { name: "Void Striders",   emoji: "💜", rarity: "Epic",      bonusBase: 28 },
+    { name: "Eclipse Sabatons",emoji: "🌑", rarity: "Legendary", bonusBase: 50 },
+  ],
+};
+
+// ── ITEM SETS ─────────────────────────────────────────────────────────────────
+// Equipping items sharing a prefix grants bonus effects.
+// Bonuses are additive on top of regular loot bonuses.
+const ITEM_SETS = {
+  "Ancient":     { name: "Ancient Relics",    color: "#c8a060",
+    bonuses: { 2: { desc: "+10% Gold",        stat: "gold",      value: 0.10 },
+               3: { desc: "+25% Gold & −5% CDs", stat: "gold",  value: 0.25, extra: { stat: "cdReduce", value: 0.05 } } } },
+  "Cursed":      { name: "Cursed Set",         color: "#aa44ee",
+    bonuses: { 2: { desc: "+12% Click Dmg",   stat: "clickMult", value: 0.12 },
+               3: { desc: "+30% Click Dmg",   stat: "clickMult", value: 0.30 } } },
+  "Blazing":     { name: "Blazing Arsenal",    color: "#ff6622",
+    bonuses: { 2: { desc: "+15% Hero DPS",    stat: "dpsMult",   value: 0.15 },
+               3: { desc: "+35% Hero DPS",    stat: "dpsMult",   value: 0.35 } } },
+  "Spectral":    { name: "Spectral Pact",      color: "#88aaff",
+    bonuses: { 2: { desc: "−10% Cooldowns",   stat: "cdReduce",  value: 0.10 },
+               3: { desc: "−22% Cooldowns",   stat: "cdReduce",  value: 0.22 } } },
+  "Obsidian":    { name: "Obsidian Dominion",  color: "#5a3a7a",
+    bonuses: { 2: { desc: "+10% Gold",        stat: "gold",      value: 0.10 },
+               3: { desc: "+20% Gold + +15% DPS", stat: "gold", value: 0.20, extra: { stat: "dpsMult", value: 0.15 } } } },
+  "Voidforged":  { name: "Voidforged",         color: "#cc44ff",
+    bonuses: { 2: { desc: "+18% Click Dmg",   stat: "clickMult", value: 0.18 },
+               4: { desc: "+50% ALL stats",   stat: "clickMult", value: 0.50, extra: { stat: "dpsMult", value: 0.50 } } } },
+  "Lich-Touched":{ name: "Lich's Gift",        color: "#44ccaa",
+    bonuses: { 2: { desc: "+15% DPS",         stat: "dpsMult",   value: 0.15 },
+               3: { desc: "+15% DPS +15% Gold", stat: "dpsMult", value: 0.15, extra: { stat: "gold", value: 0.15 } } } },
+};
+
+// Stars display string
+function starsStr(stars = 1, max = 5) {
+  const filled = Math.min(stars, max);
+  return "★".repeat(filled) + "☆".repeat(max - filled);
+}
+
+// Roll stars 1-5 based on zone (higher zone = higher base stars chance)
+function rollStars(zone) {
+  const r = Math.random();
+  const zBonus = Math.min(zone / 60, 1); // 0-1 factor
+  if (r < 0.04 + zBonus * 0.06) return 5;
+  if (r < 0.12 + zBonus * 0.10) return 4;
+  if (r < 0.30 + zBonus * 0.10) return 3;
+  if (r < 0.60 + zBonus * 0.05) return 2;
+  return 1;
+}
+
+// Evolve cost in Void Dust (tier 1→2: cheap, tier 3→4: expensive)
+function evolveCost(evolutionTier) {
+  return [20, 60, 180, 0][Math.min(evolutionTier, 3)];
+}
+
+// Get set bonuses for currently equipped items
+function computeSetBonuses(equippedItems) {
+  const prefixCount = {};
+  for (const item of equippedItems) {
+    if (!item || !item.equipped) continue;
+    const prefix = item.name?.split(" ")[0];
+    if (prefix && ITEM_SETS[prefix]) prefixCount[prefix] = (prefixCount[prefix] || 0) + 1;
+  }
+  const bonuses = { clickMult: 0, dpsMult: 0, gold: 0, cdReduce: 0 };
+  const activeSets = [];
+  for (const [prefix, count] of Object.entries(prefixCount)) {
+    const setDef = ITEM_SETS[prefix];
+    if (!setDef) continue;
+    const tiers = Object.keys(setDef.bonuses).map(Number).sort((a,b) => b - a);
+    for (const tier of tiers) {
+      if (count >= tier) {
+        const b = setDef.bonuses[tier];
+        bonuses[b.stat] = (bonuses[b.stat] || 0) + b.value;
+        if (b.extra) bonuses[b.extra.stat] = (bonuses[b.extra.stat] || 0) + b.extra.value;
+        activeSets.push({ prefix, count, tier, setDef, bonus: b });
+        break;
+      }
+    }
+  }
+  return { bonuses, activeSets };
+}
+
 function rollLootItem(zone) {
   const prefix = LOOT_PREFIXES[Math.floor(Math.random() * LOOT_PREFIXES.length)];
   const t      = LOOT_TYPES[Math.floor(Math.random() * LOOT_TYPES.length)];
-  // Bonus scales softly with zone: 5-40%
-  const bonus  = Math.round((5 + Math.min(zone * 0.3, 35)) * (0.7 + Math.random() * 0.6));
-  const rarity = getItemRarity(bonus);
-  // Rings randomly fill ring1 or ring2 slot
-  const slot = t.slot === "ring" ? (Math.random() < 0.5 ? "ring1" : "ring2") : t.slot;
+  const stars  = rollStars(zone);
+
+  // Use evolution chain tier 0 for the item type, adjusted by zone
+  const chain  = WEAPON_CHAINS[t.type];
+  const evolveTier = chain
+    ? Math.min(Math.floor(zone / 25), chain.length - 1)  // zone 0-24→tier0, 25-49→tier1, etc.
+    : 0;
+  const chainEntry = chain ? chain[evolveTier] : null;
+
+  // Bonus: chain base + star bonus + zone scaling
+  const baseBonus = chainEntry ? chainEntry.bonusBase : Math.round(5 + Math.min(zone * 0.3, 35));
+  const starMult  = 1 + (stars - 1) * 0.12; // ★2=+12%, ★3=+24%, ★4=+36%, ★5=+48%
+  const bonus     = Math.round(baseBonus * starMult * (0.85 + Math.random() * 0.3));
+
+  const rarity = chainEntry ? chainEntry.rarity : getItemRarity(bonus);
+  const slot   = t.slot === "ring" ? (Math.random() < 0.5 ? "ring1" : "ring2") : t.slot;
+
   return {
-    id:     `loot_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
-    name:   `${prefix} ${t.type}`,
-    emoji:  t.emoji,
-    type:   t.type,
+    id:           `loot_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
+    name:         chainEntry ? `${prefix} ${chainEntry.name}` : `${prefix} ${t.type}`,
+    emoji:        chainEntry ? chainEntry.emoji : t.emoji,
+    type:         t.type,
     slot,
-    stat:   t.stat,
-    label:  t.label,
-    bonus,  // percentage
+    stat:         t.stat,
+    label:        t.label,
+    bonus,
     rarity,
     zone,
-    equipped: false,
+    stars,
+    evolutionTier: evolveTier,
+    equipped:     false,
     upgradeLevel: 0,
   };
 }
@@ -1102,17 +1384,23 @@ function computeArtifactBonuses(artifactOwned) {
   return b;
 }
 
-// Compute equipped loot bonuses
+// Compute equipped loot bonuses (gear stats + set bonuses)
 function computeLootBonuses(lootItems) {
   const b = { clickMult: 0, dpsMult: 0, gold: 0, cdReduce: 0 };
-  for (const item of lootItems) {
-    if (!item.equipped) continue;
+  const equippedItems = lootItems.filter(i => i.equipped);
+  for (const item of equippedItems) {
     const totalBonus = (item.bonus + (item.upgradeLevel || 0)) / 100;
     if (item.stat === "clickMult") b.clickMult += totalBonus;
     if (item.stat === "dpsMult")   b.dpsMult   += totalBonus;
     if (item.stat === "gold")      b.gold       += totalBonus;
     if (item.stat === "cdReduce")  b.cdReduce   += totalBonus;
   }
+  // Set bonuses
+  const { bonuses: sb } = computeSetBonuses(equippedItems);
+  b.clickMult += sb.clickMult || 0;
+  b.dpsMult   += sb.dpsMult   || 0;
+  b.gold      += sb.gold      || 0;
+  b.cdReduce  += sb.cdReduce  || 0;
   return b;
 }
 
@@ -1331,6 +1619,20 @@ export default function IdleRPG() {
   const [newLootCount, setNewLootCount]           = useState(0);
   const [newAchievementCount, setNewAchievementCount] = useState(0);
 
+  // ── Pet system ────────────────────────────────────────────────────────────
+  // petOwned: { baby_dragon: { tier: 0 }, ghost_wolf: { tier: 1 }, ... }
+  // Pets survive Rebirth — this is intentional and a key retention hook.
+  const [petOwned,    setPetOwned]    = useState({});   // petId → { tier }
+  const [activePet,   setActivePet]   = useState(null); // petId | null
+  const [newPetCount, setNewPetCount] = useState(0);    // badge for nav
+
+  // ── Gacha / Summon system ─────────────────────────────────────────────────
+  const [eclipseShards, setEclipseShards] = useState(50);   // starting shards
+  const [gachaPity,     setGachaPity]     = useState({ hero: 0, spirit: 0 }); // pulls since last legendary per banner
+  const [summonModal,   setSummonModal]   = useState(null);  // null | { phase, banner, results, revealIdx }
+  const [activeBanner,  setActiveBanner]  = useState("hero"); // "hero" | "spirit"
+  const [pullHistory,   setPullHistory]   = useState([]);    // last 20 pulls [{rarity,emoji,name}]
+
   // (placeholder for future world-transition polish)
   const [pendingWorldBg, setPendingWorldBg] = useState(null);
 
@@ -1365,6 +1667,10 @@ export default function IdleRPG() {
     // ── achievement / stats ──
     totalClicks, totalKills, totalGoldEarned, totalGoldSpent,
     maxZoneReached, maxComboReached, unlockedAchievements,
+    // ── pets ──
+    petOwned, activePet,
+    // ── gacha ──
+    eclipseShards, gachaPity,
     // ── derived / computed ──
     maxWp:       commanderPath === "void_mage" ? 3 : 2,
     // enemy and currentEnemy are synced below (also written imperatively by spawnEnemy)
@@ -1393,6 +1699,28 @@ export default function IdleRPG() {
   const baseIdleDps  = useMemo(() => computeIdleDps(heroLevels, boughtUpgrades, artifactOwned),
                                      [heroLevels, boughtUpgrades, artifactOwned]);
 
+  // Pet bonuses — derived from active pet + its current evolution tier
+  // Handles both direct-buy PETS (tiered) and gacha SPIRIT_EGG_POOL (flat).
+  const petBonuses = useMemo(() => {
+    const b = { dpsMult: 0, critAdd: 0, killGold: 0, goldTickMult: 0 };
+    if (!activePet || !petOwned[activePet]) return b;
+    const applyType = (type, bonus) => {
+      if (type === "dpsMult")  b.dpsMult      = bonus;
+      if (type === "critMult") b.critAdd      = bonus;
+      if (type === "killGold") b.killGold     = bonus;
+      if (type === "goldTick") b.goldTickMult = bonus;
+    };
+    const rp = PETS.find(p => p.id === activePet);
+    if (rp) {
+      const td = rp.tiers[petOwned[activePet].tier || 0];
+      if (td) applyType(rp.type, td.bonus);
+      return b;
+    }
+    const gp = SPIRIT_EGG_POOL.find(p => p.id === activePet);
+    if (gp) applyType(gp.type, gp.bonus);
+    return b;
+  }, [activePet, petOwned]);
+
   const isBerserk   = now < (abilityState.berserk?.activeUntil   || 0);
   const isBattleCry = now < (abilityState.battlecry?.activeUntil || 0);
   const isGoldRush  = now < (abilityState.goldrush?.activeUntil  || 0);
@@ -1409,7 +1737,7 @@ export default function IdleRPG() {
   const pathGoldBonus   = commanderPath === "tactician" ? 0.2 : 0;
   const clickArtMult    = 1 + artBonuses.clickMult + lootBonuses.clickMult + achBonuses.clickMult;
   const effectiveDmg    = (clickDmg + heroPassives.clickAdd) * (isBerserk ? 10 : 1) * dmgMult * clickArtMult * pathClickMult * (1 + heroPassives.dmgMult) * compBuffs.clickMult;
-  const idleDps         = baseIdleDps * (1 + lootBonuses.dpsMult + achBonuses.dpsMult) * (1 + heroPassives.dpsAdd) * dmgMult * rebirthMult * pathDpsMult * compBuffs.dpsMult;
+  const idleDps         = baseIdleDps * (1 + lootBonuses.dpsMult + achBonuses.dpsMult) * (1 + heroPassives.dpsAdd) * dmgMult * rebirthMult * pathDpsMult * compBuffs.dpsMult * (1 + petBonuses.dpsMult);
 
   const rebirthGoldBonus = REBIRTH_MILESTONES
     .filter(m => m.type === "goldBonus" && rebirthCount >= m.count)
@@ -1419,10 +1747,11 @@ export default function IdleRPG() {
   gsRef.current.goldMult    = isGoldRush ? 2 : 1;
   gsRef.current.rebirthMult = rebirthMult;
   gsRef.current.idleDps     = idleDps;
-  gsRef.current.artGoldMult = (1 + artBonuses.goldMult + lootBonuses.gold + pathGoldBonus + heroPassives.goldMult + achBonuses.goldMult + rebirthGoldBonus) * compBuffs.goldMult;
+  gsRef.current.artGoldMult = (1 + artBonuses.goldMult + lootBonuses.gold + pathGoldBonus + heroPassives.goldMult + achBonuses.goldMult + rebirthGoldBonus + petBonuses.killGold) * compBuffs.goldMult;
   gsRef.current.effectiveDmg= effectiveDmg;
   gsRef.current.artSynergy  = artBonuses.synergyPct;
   gsRef.current.pathDpsMult = pathDpsMult;
+  gsRef.current.petGoldTickMult = petBonuses.goldTickMult;
 
   const currentLore = getCurrentLore(zone);
 
@@ -1499,18 +1828,27 @@ export default function IdleRPG() {
         if (sv.soulCrystals    != null) setSoulCrystals(sv.soulCrystals);
         if (sv.artifactOwned)          setArtifactOwned(sv.artifactOwned);
         if (sv.lootItems) {
-          // Migrate old items: add slot + upgradeLevel if missing
+          // Migrate old items: add slot + upgradeLevel + stars + evolutionTier if missing
           const migrated = sv.lootItems.map(item => {
             const withLevel = item.upgradeLevel !== undefined ? item : { ...item, upgradeLevel: 0 };
-            if (withLevel.slot) return withLevel;
+            const withStars = withLevel.stars !== undefined ? withLevel : { ...withLevel, stars: 1 };
+            const withEvo   = withStars.evolutionTier !== undefined ? withStars : { ...withStars, evolutionTier: 0 };
+            if (withEvo.slot) return withEvo;
             const slotMap = { Sword: "weapon", Armor: "chest", Ring: "ring1", Amulet: "amulet", Helmet: "helmet", Gloves: "gloves", Boots: "boots" };
-            return { ...withLevel, slot: slotMap[item.type] || item.type?.toLowerCase() || "weapon" };
+            return { ...withEvo, slot: slotMap[item.type] || item.type?.toLowerCase() || "weapon" };
           });
           setLootItems(migrated);
         }
         if (sv.voidDust        != null) setVoidDust(sv.voidDust);
         if (sv.commanderPath)          setCommanderPath(sv.commanderPath);
         if (sv.farmMode != null)       setFarmMode(sv.farmMode);
+        // Pet system (persists across Rebirth)
+        if (sv.petOwned)               setPetOwned(sv.petOwned);
+        if (sv.activePet)              setActivePet(sv.activePet);
+        // Gacha system (persists across Rebirth)
+        if (sv.eclipseShards != null)  setEclipseShards(sv.eclipseShards);
+        if (sv.gachaPity)              setGachaPity(sv.gachaPity);
+        if (sv.pullHistory)            setPullHistory(sv.pullHistory);
         // Achievement stats
         if (sv.unlockedAchievements)   setUnlockedAchievements(sv.unlockedAchievements);
         if (sv.totalClicks    != null) setTotalClicks(sv.totalClicks);
@@ -1552,6 +1890,13 @@ export default function IdleRPG() {
     voidDust:       gsRef.current.voidDust,
     commanderPath:  gsRef.current.commanderPath,
     farmMode:       gsRef.current.farmMode,
+    // Pet system — persists across Rebirth
+    petOwned:       gsRef.current.petOwned,
+    activePet:      gsRef.current.activePet,
+    // Gacha system — persists across Rebirth
+    eclipseShards:  gsRef.current.eclipseShards,
+    gachaPity:      gsRef.current.gachaPity,
+    pullHistory:    pullHistory.slice(-20),
     savedDps:       gsRef.current.idleDps + (gsRef.current.companionLevels
                       ? COMPANIONS.reduce((sum, c) => {
                           const lv = (gsRef.current.companionLevels[c.id] || 0);
@@ -1640,6 +1985,16 @@ export default function IdleRPG() {
             const newMaxZone = Math.max(gsRef.current.maxZoneReached, nz);
             if (newMaxZone > gsRef.current.maxZoneReached) setMaxZoneReached(newMaxZone);
             checkAchievements({ totalKills: newTotalKills, totalGoldEarned: newGoldEarned, maxZone: newMaxZone });
+
+            // Eclipse Shards reward — boss kills only
+            if (BOSS_ZONES.has(gsRef.current.zone - 1)) {
+              const shards = getBossShardReward(gsRef.current.zone - 1);
+              setEclipseShards(s => s + shards);
+            }
+            // Bonus shards every 10 zones
+            if ((nz - 1) % 10 === 0 && nz > 1) {
+              setEclipseShards(s => s + 10);
+            }
 
             // Chest drop system:
             // - 10% chance to get a chest on boss milestone kills
@@ -1748,6 +2103,7 @@ export default function IdleRPG() {
       weakPoint:   0,  // 2500ms
       comboDecay:  0,  // 150ms
       compAbility: 0,  // 500ms
+      petGold:     0,  // 3000ms — Slime King Mini auto-gold tick
     };
 
     let rafId;
@@ -1798,6 +2154,24 @@ export default function IdleRPG() {
         last.comboDecay = ts;
         if (Date.now() - lastClickTimeRef.current > 800) {
           setComboCount(c => (c > 0 ? Math.max(0, c - 3) : 0));
+        }
+      }
+
+      // 3000ms — Slime King Mini: auto-collect gold = mult × current enemy goldReward × all gold modifiers
+      if (ts - last.petGold >= 3000) {
+        last.petGold = ts;
+        const tickMult = gsRef.current.petGoldTickMult;
+        if (tickMult > 0 && gsRef.current.enemy) {
+          const tickGold = Math.floor(
+            gsRef.current.enemy.goldReward *
+            tickMult *
+            gsRef.current.goldMult *
+            gsRef.current.rebirthMult *
+            gsRef.current.artGoldMult
+          );
+          if (tickGold > 0) {
+            setGold(g => g + tickGold);
+          }
         }
       }
 
@@ -1866,6 +2240,33 @@ export default function IdleRPG() {
       setCompBuffs({ clickMult, dpsMult, goldMult });
     }
   }, [now]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── summon portal phase: portal → revealing ───────────────────────────────
+  useEffect(() => {
+    if (!summonModal || summonModal.phase !== "portal") return;
+    const hasLegendary = summonModal.results.some(r => r.rarity === "Legendary");
+    const delay = hasLegendary ? 2200 : 1500;
+    const t = setTimeout(() => {
+      setSummonModal(m => m ? { ...m, phase: "revealing", revealIdx: 0 } : null);
+    }, delay);
+    return () => clearTimeout(t);
+  }, [summonModal?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── summon modal phase: auto-advance card reveals ─────────────────────────
+  useEffect(() => {
+    if (!summonModal || summonModal.phase !== "revealing") return;
+    if (summonModal.revealIdx >= summonModal.results.length) {
+      setSummonModal(m => m ? { ...m, phase: "done" } : null);
+      return;
+    }
+    const card     = summonModal.results[summonModal.revealIdx];
+    const isLegend = card?.rarity === "Legendary";
+    const delay    = isLegend ? 1400 : 380;
+    const t = setTimeout(() => {
+      setSummonModal(m => m ? { ...m, revealIdx: m.revealIdx + 1 } : null);
+    }, delay);
+    return () => clearTimeout(t);
+  }, [summonModal?.phase, summonModal?.revealIdx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── chronicle trigger — fires once per threshold, skips on initial save-load ──
   useEffect(() => {
@@ -2103,10 +2504,161 @@ export default function IdleRPG() {
     setLootItems(prev => prev.map(i => i.id === itemId ? { ...i, upgradeLevel: (i.upgradeLevel || 0) + amount } : i));
   };
 
+  // ── fuse 3 items of same slot → +1 star (max ★5) ─────────────────────────
+  const fuseItems = (keepId, consumeIds) => {
+    if (consumeIds.length < 2) return;
+    setLootItems(prev => {
+      const keep = prev.find(i => i.id === keepId);
+      if (!keep) return prev;
+      const newStars = Math.min(5, (keep.stars || 1) + 1);
+      const starMult  = 1 + (newStars - 1) * 0.12;
+      const chain     = WEAPON_CHAINS[keep.type];
+      const chainEntry = chain ? chain[keep.evolutionTier || 0] : null;
+      const baseBonus  = chainEntry ? chainEntry.bonusBase : keep.bonus;
+      const newBonus   = Math.round(baseBonus * starMult);
+      const newRarity  = chainEntry ? chainEntry.rarity : getItemRarity(newBonus);
+      return prev
+        .filter(i => !consumeIds.includes(i.id))
+        .map(i => i.id === keepId
+          ? { ...i, stars: newStars, bonus: newBonus, rarity: newRarity }
+          : i
+        );
+    });
+  };
+
+  // ── evolve item to next chain tier (requires ★5, costs Void Dust) ─────────
+  const evolveItem = (itemId) => {
+    setLootItems(prev => {
+      const item = prev.find(i => i.id === itemId);
+      if (!item) return prev;
+      const chain = WEAPON_CHAINS[item.type];
+      if (!chain) return prev;
+      const nextTier = (item.evolutionTier || 0) + 1;
+      if (nextTier >= chain.length) return prev;
+      const cost = evolveCost(item.evolutionTier || 0);
+      if (voidDust < cost) return prev;
+      setVoidDust(d => d - cost);
+      const nextEntry = chain[nextTier];
+      // Keep prefix, swap chain name
+      const prefix = item.name.split(" ")[0];
+      const newBonus = Math.round(nextEntry.bonusBase * (1 + ((item.stars || 1) - 1) * 0.12));
+      return prev.map(i => i.id === itemId
+        ? { ...i,
+            evolutionTier: nextTier,
+            name: `${prefix} ${nextEntry.name}`,
+            emoji: nextEntry.emoji,
+            rarity: nextEntry.rarity,
+            stars: 1,          // reset stars on evolution
+            bonus: newBonus,
+            upgradeLevel: 0,
+          }
+        : i
+      );
+    });
+  };
+
+  // ── gacha pull ────────────────────────────────────────────────────────────
+  const performPull = (banner, count = 1) => {
+    const cost = GACHA_PULL_COST * count;
+    if (eclipseShards < cost) return;
+    setEclipseShards(s => s - cost);
+
+    const pool = banner === "hero" ? HERO_BANNER_POOL : SPIRIT_EGG_POOL;
+    const results = [];
+    let pity = gachaPity[banner] || 0;
+
+    for (let i = 0; i < count; i++) {
+      pity++;
+      const rarity  = rollGachaRarity(pity);
+      const item    = drawFromPool(pool, rarity);
+      const isNew   = banner === "hero"
+        ? (heroLevels[item.id] || 0) === 0
+        : !petOwned[item.id];
+      results.push({ ...item, isNew, pullIndex: i });
+      if (rarity === "Legendary") pity = 0;
+    }
+
+    setGachaPity(prev => ({ ...prev, [banner]: pity }));
+    setPullHistory(prev => [...results.map(r => ({ rarity: r.rarity, emoji: r.emoji || HEROES.find(h=>h.id===r.id)?.emoji, name: r.name || HEROES.find(h=>h.id===r.id)?.name })), ...prev].slice(0, 30));
+
+    // Apply results to game state immediately (rewards in background, drama in foreground)
+    if (banner === "hero") {
+      const newLevels = { ...heroLevels };
+      let dust = 0;
+      for (const r of results) {
+        const hero = HEROES.find(h => h.id === r.id);
+        if (!hero) continue;
+        if ((newLevels[hero.id] || 0) > 0) {
+          // Duplicate: award Void Dust as consolation
+          dust += { Common: 5, Rare: 15, Epic: 40, Legendary: 120 }[r.rarity] || 5;
+        } else {
+          newLevels[hero.id] = 1;
+        }
+      }
+      setHeroLevels(newLevels);
+      if (dust > 0) setVoidDust(d => d + dust);
+    } else {
+      const newPets = { ...petOwned };
+      let dust = 0;
+      for (const r of results) {
+        if (newPets[r.id]) {
+          dust += { Common: 3, Rare: 10, Epic: 30, Legendary: 100 }[r.rarity] || 3;
+        } else {
+          newPets[r.id] = { tier: 0 };
+        }
+      }
+      setPetOwned(newPets);
+      if (dust > 0) setVoidDust(d => d + dust);
+      // Auto-equip first legendary spirit if no pet active
+      const legendary = results.find(r => r.rarity === "Legendary" && !petOwned[r.id]);
+      if (legendary && !activePet) setActivePet(legendary.id);
+    }
+
+    // Start the reveal modal
+    setSummonModal({ phase: "portal", banner, results, revealIdx: -1 });
+  };
+
+  // ── buy pet ───────────────────────────────────────────────────────────────
+  const buyPet = (pet) => {
+    if (petOwned[pet.id]) return; // already owned
+    if (zone < pet.unlockZone) return; // not unlocked yet
+    if (pet.unlockCurrency === "gold") {
+      if (gold < pet.unlockCost) return;
+      setGold(g => g - pet.unlockCost);
+      const spent = gsRef.current.totalGoldSpent + pet.unlockCost;
+      setTotalGoldSpent(spent);
+      checkAchievements({ totalGoldSpent: spent });
+    } else if (pet.unlockCurrency === "voidDust") {
+      if (voidDust < pet.unlockCost) return;
+      setVoidDust(d => d - pet.unlockCost);
+    } else if (pet.unlockCurrency === "soulCrystals") {
+      if (soulCrystals < pet.unlockCost) return;
+      setSoulCrystals(c => c - pet.unlockCost);
+    }
+    setPetOwned(prev => ({ ...prev, [pet.id]: { tier: 0 } }));
+    setActivePet(pet.id); // auto-equip newly bought pet
+    setNewPetCount(c => c + 1);
+  };
+
+  // ── evolve pet ────────────────────────────────────────────────────────────
+  const evolvePet = (pet) => {
+    const owned = petOwned[pet.id];
+    if (!owned) return;
+    const currentTier = owned.tier || 0;
+    const tierData = pet.tiers[currentTier];
+    if (!tierData || tierData.evolveCost === null) return; // max tier
+    if (tierData.evolveCurrency === "voidDust") {
+      if (voidDust < tierData.evolveCost) return;
+      setVoidDust(d => d - tierData.evolveCost);
+    }
+    setPetOwned(prev => ({ ...prev, [pet.id]: { tier: currentTier + 1 } }));
+    setNewPetCount(c => c + 1);
+  };
+
   // ── weak point crit click ─────────────────────────────────────────────────
   const handleWeakPointClick = (e, wp) => {
     e.stopPropagation();
-    const critMult = commanderPath === "void_mage" ? 4 : 3;
+    const critMult = (commanderPath === "void_mage" ? 4 : 3) + petBonuses.critAdd;
     const critDmg = effectiveDmg * critMult;
     const rect = e.currentTarget.closest('[data-enemycard]').getBoundingClientRect();
     const cx = (wp.x / 100) * rect.width;
@@ -2200,6 +2752,13 @@ export default function IdleRPG() {
           </div>
         </div>
         <div style={S.goldPill}>🪙 <span style={S.goldNum}>{fmt(gold)}</span></div>
+        <div
+          style={{ ...S.goldPill, borderColor: "#3a2a5a", cursor: "pointer" }}
+          onClick={() => setTab("summon")}
+          title="Eclipse Shards — used for Summoning"
+        >
+          🌑 <span style={{ color: "#cc88ff", fontWeight: "bold" }}>{eclipseShards}</span>
+        </div>
       </header>
 
       {/* ABILITY BARS — ultra-compact strip */}
@@ -2628,6 +3187,28 @@ export default function IdleRPG() {
                 </span>
               )}
             </div>
+
+            {/* ── ACTIVE PET BADGE ── */}
+            {activePet && petOwned[activePet] && (() => {
+              const pet     = PETS.find(p => p.id === activePet);
+              if (!pet) return null;
+              const tier    = petOwned[activePet].tier || 0;
+              const tierDat = pet.tiers[tier];
+              return (
+                <div style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 8,
+                  background: pet.color + "0f", border: `1px solid ${pet.color}44`,
+                  borderRadius: 8, padding: "6px 10px",
+                }}>
+                  <span className="pet-idle" style={{ fontSize: 18, display: "inline-block" }}>{tierDat.emoji}</span>
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: 11, fontWeight: "bold", color: pet.color }}>{pet.name}</span>
+                    <span style={{ fontSize: 9, color: pet.color + "aa", marginLeft: 5 }}>· {tierDat.name}</span>
+                  </div>
+                  <span style={{ fontSize: 10, color: pet.color, fontWeight: "bold" }}>{tierDat.desc}</span>
+                </div>
+              );
+            })()}
 
             {/* Active companion ability badges */}
             {COMPANION_ABILITIES.some(ab => now < compAbilityState[ab.id].activeUntil) && (
@@ -3306,6 +3887,7 @@ export default function IdleRPG() {
                     <span style={{ fontSize: 8, fontWeight: "bold", color: rc.color, letterSpacing: 0.5, textAlign: "center", lineWidth: 1, maxWidth: 68, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       +{item.bonus + (item.upgradeLevel || 0)}%
                     </span>
+                    <span style={{ fontSize: 7, color: "#f5c518bb", letterSpacing: 0 }}>{starsStr(item.stars || 1)}</span>
                     {(item.upgradeLevel || 0) > 0 && (
                       <span style={{ position: "absolute", top: 3, right: 4, fontSize: 8, fontWeight: "bold", color: "#c0a0ff", background: "#1a0a2a", borderRadius: 3, padding: "0 3px" }}>
                         +{item.upgradeLevel}
@@ -3359,6 +3941,23 @@ export default function IdleRPG() {
                       {lootBonuses.cdReduce > 0   && <div style={{ fontSize: 10, color: "#44cc88", marginBottom: 2 }}>⚡ -{Math.round(lootBonuses.cdReduce * 100)}% Cooldown</div>}
                       {Object.values(lootBonuses).every(v => v === 0) && <div style={{ fontSize: 10, color: "#3a2a1a", fontStyle: "italic" }}>No bonuses yet</div>}
                     </div>
+
+                    {/* ── SET BONUSES active ── */}
+                    {(() => {
+                      const { activeSets } = computeSetBonuses(lootItems.filter(i => i.equipped));
+                      if (activeSets.length === 0) return null;
+                      return (
+                        <div style={{ background: "#0d0818", border: "1px solid #5a2a9a44", borderRadius: 8, padding: "8px 10px", width: "100%", marginTop: 4 }}>
+                          <div style={{ fontSize: 9, color: "#9a60cc", letterSpacing: 1, marginBottom: 6, textTransform: "uppercase" }}>✦ Active Set Bonuses</div>
+                          {activeSets.map(({ prefix, count, tier, setDef, bonus: b }) => (
+                            <div key={prefix} style={{ fontSize: 10, color: setDef.color, marginBottom: 3, display: "flex", justifyContent: "space-between" }}>
+                              <span>{setDef.name} ({count}/{tier})</span>
+                              <span style={{ color: "#c0a0ff" }}>{b.desc}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Right column */}
@@ -3381,25 +3980,41 @@ export default function IdleRPG() {
                       {slotDef?.emoji} {slotDef?.label} Slot
                     </div>
 
-                    {/* Currently equipped item + upgrade */}
+                    {/* Currently equipped item */}
                     {equippedItem && (() => {
                       const rc = RARITIES[equippedItem.rarity || getItemRarity(equippedItem.bonus)] || RARITIES.Common;
                       const totalBonus = equippedItem.bonus + (equippedItem.upgradeLevel || 0);
+                      const stars = equippedItem.stars || 1;
+                      const chain = WEAPON_CHAINS[equippedItem.type];
+                      const evoTier = equippedItem.evolutionTier || 0;
+                      const canEvolve = stars >= 5 && chain && evoTier < chain.length - 1;
+                      const evCost = evolveCost(evoTier);
+                      // Fusion: same slot, same type, not equipped, not this item
+                      const fusionCandidates = lootItems.filter(i => !i.equipped && i.id !== equippedItem.id && i.type === equippedItem.type);
+                      const canFuse = fusionCandidates.length >= 2 && stars < 5;
+
                       return (
-                        <div style={{ background: rc.color + "10", border: `1px solid ${rc.color}44`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                            <span style={{ fontSize: 26 }}>{equippedItem.emoji}</span>
+                        <div style={{ background: rc.color + "10", border: `2px solid ${rc.color}66`, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                          {/* Name + rarity + stars */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                            <span style={{ fontSize: 28, filter: `drop-shadow(0 0 8px ${rc.color}88)` }}>{equippedItem.emoji}</span>
                             <div style={{ flex: 1 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", marginBottom: 2 }}>
                                 <span style={{ fontSize: 13, fontWeight: "bold", color: rc.color }}>{equippedItem.name}</span>
                                 <RarityBadge rarity={equippedItem.rarity || getItemRarity(equippedItem.bonus)} />
+                              </div>
+                              {/* Stars row */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <span style={{ fontSize: 13, color: "#f5c518", letterSpacing: 1, textShadow: stars >= 5 ? "0 0 8px #f5c51888" : "none" }}>
+                                  {starsStr(stars)}
+                                </span>
                                 {(equippedItem.upgradeLevel || 0) > 0 && (
                                   <span style={{ fontSize: 10, background: "#1a0a2a", color: "#c0a0ff", border: "1px solid #5a20aa", borderRadius: 4, padding: "1px 5px" }}>
-                                    +{equippedItem.upgradeLevel} upgraded
+                                    +{equippedItem.upgradeLevel} reforged
                                   </span>
                                 )}
                               </div>
-                              <div style={{ fontSize: 11, color: "#8a7a5a" }}>+{totalBonus}% {equippedItem.label} · Zone {equippedItem.zone}</div>
+                              <div style={{ fontSize: 11, color: "#8a7a5a", marginTop: 2 }}>+{totalBonus}% {equippedItem.label} · Zone {equippedItem.zone}</div>
                             </div>
                             <button
                               onClick={() => toggleEquip(equippedItem.id)}
@@ -3407,9 +4022,67 @@ export default function IdleRPG() {
                               Unequip
                             </button>
                           </div>
-                          {/* Upgrade with Void Dust */}
+
+                          {/* Evolution chain preview */}
+                          {chain && (
+                            <div style={{ borderTop: `1px solid ${rc.color}22`, paddingTop: 8, marginBottom: 8 }}>
+                              <div style={{ fontSize: 9, color: "#7a5a3a", letterSpacing: 1, marginBottom: 6, textTransform: "uppercase" }}>🔗 Evolution Chain</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 3, overflowX: "auto" }}>
+                                {chain.map((step, i) => {
+                                  const isCurrent = i === evoTier;
+                                  const isPast = i < evoTier;
+                                  const sc = RARITIES[step.rarity] || RARITIES.Common;
+                                  return (
+                                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
+                                      <div style={{ textAlign: "center", padding: "4px 6px", borderRadius: 6, border: `1px solid ${isCurrent ? sc.color : isPast ? "#3a6a3a" : "#2a1a10"}`, background: isCurrent ? sc.color + "20" : isPast ? "#0a1808" : "#080604", minWidth: 44 }}>
+                                        <div style={{ fontSize: 16, filter: isPast ? "grayscale(0.5)" : isCurrent ? `drop-shadow(0 0 6px ${sc.color})` : "grayscale(0.8) opacity(0.4)" }}>{step.emoji}</div>
+                                        <div style={{ fontSize: 7, color: isCurrent ? sc.color : isPast ? "#4a8a4a" : "#3a2a1a", fontWeight: isCurrent ? "bold" : "normal", whiteSpace: "nowrap", overflow: "hidden", maxWidth: 44, textOverflow: "ellipsis" }}>{step.name.split(" ").pop()}</div>
+                                        {isPast && <div style={{ fontSize: 6, color: "#4a9a4a" }}>✓</div>}
+                                        {isCurrent && <div style={{ fontSize: 7, color: "#f5c518", letterSpacing: 0.5 }}>{starsStr(stars, 5)}</div>}
+                                      </div>
+                                      {i < chain.length - 1 && <span style={{ fontSize: 10, color: "#3a2a1a" }}>→</span>}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Evolve button */}
+                          {canEvolve && (
+                            <button
+                              onClick={() => evolveItem(equippedItem.id)}
+                              disabled={voidDust < evCost}
+                              style={{ width: "100%", padding: "9px", borderRadius: 8, marginBottom: 8, fontSize: 12, fontWeight: "bold", fontFamily: "inherit", cursor: voidDust >= evCost ? "pointer" : "not-allowed",
+                                border: `2px solid ${voidDust >= evCost ? "#cc88ff" : "#3a1a5a"}`,
+                                background: voidDust >= evCost ? "linear-gradient(90deg,#1a0a2a,#2a0a3a)" : "#0a0608",
+                                color: voidDust >= evCost ? "#ee88ff" : "#4a2a6a",
+                                boxShadow: voidDust >= evCost ? "0 0 16px #cc44ff44" : "none",
+                              }}>
+                              ✦ EVOLVE → {chain[evoTier + 1]?.name} &nbsp;
+                              <span style={{ fontSize: 10, color: voidDust >= evCost ? "#aa66dd" : "#3a1a5a" }}>🌌{evCost}</span>
+                            </button>
+                          )}
+
+                          {/* Fusion button */}
+                          {canFuse && (
+                            <button
+                              onClick={() => {
+                                const ids = fusionCandidates.slice(0, 2).map(i => i.id);
+                                fuseItems(equippedItem.id, ids);
+                              }}
+                              style={{ width: "100%", padding: "8px", borderRadius: 8, marginBottom: 8, fontSize: 11, fontWeight: "bold", fontFamily: "inherit", cursor: "pointer",
+                                border: "1px solid #f5c51888",
+                                background: "linear-gradient(90deg,#1a1408,#221c08)",
+                                color: "#f5c518",
+                              }}>
+                              ★ FUSE (use 2 {equippedItem.type}s from inventory → ★{Math.min(5, (equippedItem.stars||1)+1)})
+                            </button>
+                          )}
+
+                          {/* Reforge with Void Dust */}
                           <div style={{ borderTop: `1px solid ${rc.color}22`, paddingTop: 8 }}>
-                            <div style={{ fontSize: 9, color: "#8a6a9a", letterSpacing: 1, marginBottom: 6, textTransform: "uppercase" }}>🌌 Upgrade with Void Dust</div>
+                            <div style={{ fontSize: 9, color: "#8a6a9a", letterSpacing: 1, marginBottom: 6, textTransform: "uppercase" }}>🌌 Reforge with Void Dust</div>
                             <div style={{ display: "flex", gap: 5 }}>
                               {dustUpgradeCosts.map(u => (
                                 <button key={u.label}
@@ -3448,6 +4121,7 @@ export default function IdleRPG() {
                           const rc = RARITIES[itemRarity] || RARITIES.Common;
                           const isEquipped = item.equipped;
                           const totalBonus = item.bonus + (item.upgradeLevel || 0);
+                          const stars = item.stars || 1;
                           return (
                             <div key={item.id} style={{
                               display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", marginBottom: 4,
@@ -3455,10 +4129,11 @@ export default function IdleRPG() {
                               background: isEquipped ? rc.color + "0d" : "#0a0908",
                               borderLeft: `3px solid ${rc.color}`,
                             }}>
-                              <span style={{ fontSize: 20 }}>{item.emoji}</span>
+                              <span style={{ fontSize: 20, filter: `drop-shadow(0 0 4px ${rc.color}66)` }}>{item.emoji}</span>
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 12, fontWeight: "bold", color: isEquipped ? rc.color : "#8a7a5a" }}>{item.name}</div>
-                                <div style={{ fontSize: 10, color: "#6a5a3a" }}>+{totalBonus}% {item.label} · Z{item.zone}</div>
+                                <div style={{ fontSize: 11, fontWeight: "bold", color: isEquipped ? rc.color : "#8a7a5a" }}>{item.name}</div>
+                                <div style={{ fontSize: 10, color: "#f5c518aa", letterSpacing: 0.5 }}>{starsStr(stars)}</div>
+                                <div style={{ fontSize: 9, color: "#6a5a3a" }}>+{totalBonus}% {item.label} · Z{item.zone}</div>
                               </div>
                               <RarityBadge rarity={itemRarity} />
                               <button
@@ -3474,7 +4149,7 @@ export default function IdleRPG() {
                 );
               })()}
 
-              {/* ── UNSLOTTED / ALL LOOT ── */}
+              {/* ── ALL LOOT (no slot selected) ── */}
               {!selectedGearSlot && (
                 <div style={{ background: "#0a0908", border: "1px solid #1e1810", borderRadius: 12, padding: "12px 10px" }}>
                   <div style={{ fontSize: 9, color: "#6a5a3a", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>
@@ -3482,26 +4157,34 @@ export default function IdleRPG() {
                   </div>
                   {lootItems.length === 0
                     ? <div style={{ fontSize: 11, color: "#3a2a1a", fontStyle: "italic" }}>Defeat zone bosses for a 10% chest drop chance.</div>
-                    : [...lootItems].sort((a,b) => b.bonus - a.bonus).map(item => {
+                    : [...lootItems].sort((a,b) => (b.stars||1) - (a.stars||1) || b.bonus - a.bonus).map(item => {
                         const itemRarity = item.rarity || getItemRarity(item.bonus);
                         const rc = RARITIES[itemRarity] || RARITIES.Common;
                         const isEquipped = item.equipped;
                         const totalBonus = item.bonus + (item.upgradeLevel || 0);
+                        const stars = item.stars || 1;
                         const slot = item.slot || (item.type === "Armor" ? "chest" : item.type?.toLowerCase());
                         const slotDef = EQUIP_SLOTS.find(s => s.id === slot || (s.id === "ring1" && slot === "ring1") || (s.id === "ring2" && slot === "ring2"));
+                        const chain = WEAPON_CHAINS[item.type];
+                        const evoTier = item.evolutionTier || 0;
+                        const maxTier = chain ? chain.length - 1 : 0;
                         return (
                           <div key={item.id} style={{
                             display: "flex", alignItems: "center", gap: 8, padding: "7px 8px", marginBottom: 4,
                             borderRadius: 8, border: `1px solid ${isEquipped ? rc.color + "55" : "#1e1810"}`,
                             background: isEquipped ? rc.color + "0a" : "transparent",
-                            borderLeft: `3px solid ${isEquipped ? rc.color : "#2a2010"}`,
+                            borderLeft: `3px solid ${rc.color}`,
                           }}>
-                            <span style={{ fontSize: 18 }}>{item.emoji}</span>
+                            <span style={{ fontSize: 18, filter: `drop-shadow(0 0 4px ${rc.color}55)` }}>{item.emoji}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 11, fontWeight: "bold", color: isEquipped ? rc.color : "#8a7a5a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {item.name} {(item.upgradeLevel||0) > 0 ? `(+${item.upgradeLevel})` : ""}
+                                {item.name}
                               </div>
-                              <div style={{ fontSize: 9, color: "#5a4a2a" }}>+{totalBonus}% {item.label} · {slotDef ? slotDef.label : slot}</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 10, color: stars >= 5 ? "#f5c518" : "#c0900088", letterSpacing: 0.5 }}>{starsStr(stars)}</span>
+                                {chain && <span style={{ fontSize: 8, color: "#5a3a7a", letterSpacing: 0.5 }}>Tier {evoTier+1}/{maxTier+1}</span>}
+                                <span style={{ fontSize: 9, color: "#5a4a2a" }}>+{totalBonus}% · {slotDef ? slotDef.label : slot}</span>
+                              </div>
                             </div>
                             <button
                               onClick={() => toggleEquip(item.id)}
@@ -3862,35 +4545,595 @@ export default function IdleRPG() {
           </div>
         )}
 
+        {/* ── PETS TAB ── */}
+        {tab === "pets" && (
+          <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+
+            {/* Header */}
+            <div style={{ background: "linear-gradient(135deg,#0d0a1a,#0a1008)", border: "1px solid #2a1a3a", borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ fontSize: 14, fontWeight: "bold", color: "#e8dcc8", marginBottom: 4 }}>🐾 Companion Spirits</div>
+              <div style={{ fontSize: 11, color: "#6a5a7a", lineHeight: 1.5 }}>
+                Pets survive every Rebirth and grow stronger through evolution. Only one pet can be active at a time.
+              </div>
+              {activePet && petOwned[activePet] && (() => {
+                const pet = PETS.find(p => p.id === activePet);
+                if (!pet) return null;
+                const tier = petOwned[activePet].tier || 0;
+                return (
+                  <div style={{ marginTop: 8, padding: "6px 10px", background: pet.color + "18", border: `1px solid ${pet.color}55`, borderRadius: 7, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 16 }}>{pet.tiers[tier].emoji}</span>
+                    <span style={{ fontSize: 12, color: pet.color, fontWeight: "bold" }}>Active: {pet.name} · {pet.tiers[tier].name}</span>
+                    <span style={{ marginLeft: "auto", fontSize: 11, color: pet.color + "cc" }}>{pet.tiers[tier].desc}</span>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Pet cards */}
+            {PETS.map(pet => {
+              const owned      = !!petOwned[pet.id];
+              const isActive   = activePet === pet.id;
+              const tier       = owned ? (petOwned[pet.id].tier || 0) : 0;
+              const tierDat    = pet.tiers[tier];
+              const isMaxTier  = tierDat.evolveCost === null;
+              const locked     = zone < pet.unlockZone;
+
+              // Affordability checks for buy button
+              const canBuy = !owned && !locked && (
+                pet.unlockCurrency === "gold"         ? gold >= pet.unlockCost :
+                pet.unlockCurrency === "voidDust"     ? voidDust >= pet.unlockCost :
+                pet.unlockCurrency === "soulCrystals" ? soulCrystals >= pet.unlockCost : false
+              );
+
+              // Currency label for buy cost
+              const costLabel =
+                pet.unlockCurrency === "gold"         ? `🪙 ${fmt(pet.unlockCost)}` :
+                pet.unlockCurrency === "voidDust"     ? `🌌 ${pet.unlockCost} Void Dust` :
+                pet.unlockCurrency === "soulCrystals" ? `💎 ${pet.unlockCost} SC` : "";
+
+              // Evolve affordability
+              const canEvolve = owned && !isMaxTier && (
+                tierDat.evolveCurrency === "voidDust" ? voidDust >= tierDat.evolveCost : false
+              );
+              const evolveCostLabel = tierDat.evolveCost !== null
+                ? (tierDat.evolveCurrency === "voidDust" ? `🌌 ${tierDat.evolveCost} Void Dust` : "")
+                : "";
+
+              return (
+                <div key={pet.id} style={{
+                  background: owned ? (isActive ? pet.color + "12" : "#13100a") : "#0d0b08",
+                  border: `1px solid ${owned ? (isActive ? pet.color + "88" : pet.color + "33") : "#1e1810"}`,
+                  borderRadius: 14, padding: "14px",
+                  opacity: locked ? 0.6 : 1,
+                }}>
+                  {/* Top row */}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10 }}>
+                    <div style={{
+                      fontSize: 32, width: 52, height: 52, borderRadius: 12,
+                      background: owned ? pet.color + "22" : "#1a1410",
+                      border: `1px solid ${owned ? pet.color + "55" : "#2a2010"}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                      className={owned && isActive ? "pet-idle" : ""}
+                    >
+                      {owned ? tierDat.emoji : pet.emoji}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                        <span style={{ fontSize: 14, fontWeight: "bold", color: owned ? pet.color : "#6a5a4a" }}>{pet.name}</span>
+                        {owned && (
+                          <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, background: pet.color + "22", border: `1px solid ${pet.color}55`, color: pet.color, fontWeight: "bold" }}>
+                            {isMaxTier ? "MAX" : `Tier ${tier + 1}/3`}
+                          </span>
+                        )}
+                        {locked && (
+                          <span style={{ fontSize: 9, color: "#4a3a2a" }}>🔒 Zone {pet.unlockZone}</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 10, color: "#6a5a4a", fontStyle: "italic", lineHeight: 1.4, marginBottom: 4 }}>{pet.lore}</div>
+                      {/* Tier ladder */}
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                        {pet.tiers.map((t, i) => (
+                          <span key={i} style={{
+                            fontSize: 9, padding: "1px 6px", borderRadius: 4,
+                            background: owned && tier >= i ? pet.color + "22" : "#0d0b08",
+                            border: `1px solid ${owned && tier >= i ? pet.color + "55" : "#2a2010"}`,
+                            color: owned && tier >= i ? pet.color : "#3a2a1a",
+                            fontWeight: "bold",
+                          }}>
+                            {t.emoji} {t.name}: {t.desc}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {!owned ? (
+                      <button
+                        style={{
+                          flex: 1, padding: "9px 0", borderRadius: 8, border: `1px solid ${canBuy ? pet.color + "88" : "#2a2010"}`,
+                          background: canBuy ? pet.color + "22" : "#0d0b08",
+                          color: canBuy ? pet.color : "#4a3a2a", fontSize: 12, fontWeight: "bold", fontFamily: "inherit",
+                          cursor: canBuy ? "pointer" : "not-allowed",
+                        }}
+                        onClick={() => canBuy && buyPet(pet)}
+                        disabled={!canBuy || locked}
+                      >
+                        {locked ? `🔒 Zone ${pet.unlockZone}` : `Adopt · ${costLabel}`}
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          style={{
+                            flex: 1, padding: "9px 0", borderRadius: 8, border: `1px solid ${isActive ? pet.color : pet.color + "44"}`,
+                            background: isActive ? pet.color + "33" : "#0d0b08",
+                            color: isActive ? pet.color : pet.color + "99", fontSize: 12, fontWeight: "bold", fontFamily: "inherit",
+                            cursor: isActive ? "default" : "pointer",
+                          }}
+                          onClick={() => !isActive && setActivePet(pet.id)}
+                        >
+                          {isActive ? `✦ Active` : `Deploy`}
+                        </button>
+                        {!isMaxTier && (
+                          <button
+                            style={{
+                              flex: 1, padding: "9px 0", borderRadius: 8, border: `1px solid ${canEvolve ? "#aa55ff88" : "#2a2010"}`,
+                              background: canEvolve ? "#2a1040" : "#0d0b08",
+                              color: canEvolve ? "#cc88ff" : "#4a3a2a", fontSize: 12, fontWeight: "bold", fontFamily: "inherit",
+                              cursor: canEvolve ? "pointer" : "not-allowed",
+                            }}
+                            onClick={() => canEvolve && evolvePet(pet)}
+                            disabled={!canEvolve}
+                          >
+                            ✦ Evolve · {evolveCostLabel}
+                          </button>
+                        )}
+                        {isMaxTier && (
+                          <div style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: `1px solid ${pet.color}66`, background: pet.color + "11", color: pet.color, fontSize: 11, fontWeight: "bold", textAlign: "center", letterSpacing: 1 }}>
+                            🌟 FULLY EVOLVED
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── SUMMON / GACHA TAB ── */}
+        {tab === "summon" && (() => {
+          const RARITY_COLORS = { Common:"#8a8a8a", Rare:"#3a8aee", Epic:"#9944dd", Legendary:"#f5c518" };
+          const RARITY_RATES  = { Common:"70%", Rare:"20%", Epic:"8%", Legendary:"2%" };
+          const bannerPity    = gachaPity[activeBanner] || 0;
+          const pityToLegend  = GACHA_PITY_LEGEND - bannerPity;
+          const pityToRare    = Math.max(0, GACHA_PITY_RARE - (bannerPity % GACHA_PITY_RARE));
+          const canPull1      = eclipseShards >= GACHA_PULL_COST;
+          const canPull10     = eclipseShards >= GACHA_PULL_COST * 10;
+
+          return (
+            <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
+
+              {/* Currency strip */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0d0a18", border: "1px solid #3a2a5a", borderRadius: 10, padding: "10px 14px" }}>
+                <div>
+                  <div style={{ fontSize: 10, color: "#6a5a7a", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 3 }}>Eclipse Shards</div>
+                  <div style={{ fontSize: 22, fontWeight: "bold", color: "#cc88ff" }}>🌑 {eclipseShards}</div>
+                  <div style={{ fontSize: 9, color: "#5a4a6a", marginTop: 2 }}>Earned from boss kills & zone milestones</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 10, color: "#6a5a7a", letterSpacing: 1 }}>PITY</div>
+                  <div style={{ fontSize: 13, color: "#aa77ee", fontWeight: "bold" }}>{bannerPity}/{GACHA_PITY_LEGEND}</div>
+                  <div style={{ fontSize: 9, color: "#4a3a5a" }}>Legend in {pityToLegend}</div>
+                  {pityToRare > 0 && <div style={{ fontSize: 9, color: "#3a8aee" }}>Rare+ in {pityToRare}</div>}
+                </div>
+              </div>
+
+              {/* Banner selector */}
+              <div style={{ display: "flex", gap: 6 }}>
+                {[
+                  { id: "hero",   label: "Hero Summon",  emoji: "⚔️",  desc: "Recruit heroes for your army" },
+                  { id: "spirit", label: "Spirit Egg",   emoji: "🥚",  desc: "Hatch spirit companions" },
+                ].map(b => (
+                  <button
+                    key={b.id}
+                    style={{
+                      flex: 1, padding: "10px 6px", borderRadius: 10, fontFamily: "inherit",
+                      border: `2px solid ${activeBanner === b.id ? "#aa55ff" : "#2a2010"}`,
+                      background: activeBanner === b.id ? "#1a0840" : "#0d0b08",
+                      color: activeBanner === b.id ? "#cc88ff" : "#6a5a4a",
+                      cursor: "pointer", transition: "all 0.15s",
+                    }}
+                    onClick={() => setActiveBanner(b.id)}
+                  >
+                    <div style={{ fontSize: 22, marginBottom: 3 }}>{b.emoji}</div>
+                    <div style={{ fontSize: 11, fontWeight: "bold" }}>{b.label}</div>
+                    <div style={{ fontSize: 9, opacity: 0.7, marginTop: 2 }}>{b.desc}</div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Pull buttons */}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  style={{
+                    flex: 1, padding: "14px 0", borderRadius: 12, fontFamily: "inherit",
+                    border: `2px solid ${canPull1 ? "#7a40cc88" : "#2a2010"}`,
+                    background: canPull1 ? "linear-gradient(135deg,#1a0840,#2a1060)" : "#0d0b08",
+                    color: canPull1 ? "#e0c8ff" : "#4a3a5a", fontSize: 14, fontWeight: "bold",
+                    cursor: canPull1 ? "pointer" : "not-allowed",
+                    boxShadow: canPull1 ? "0 0 20px #7a40cc33" : "none",
+                    transition: "all 0.2s",
+                  }}
+                  onClick={() => canPull1 && performPull(activeBanner, 1)}
+                  disabled={!canPull1}
+                >
+                  <div style={{ fontSize: 20, marginBottom: 2 }}>🌑</div>
+                  <div>Summon ×1</div>
+                  <div style={{ fontSize: 11, opacity: 0.75, marginTop: 2 }}>{GACHA_PULL_COST} Shards</div>
+                </button>
+                <button
+                  style={{
+                    flex: 1, padding: "14px 0", borderRadius: 12, fontFamily: "inherit",
+                    border: `2px solid ${canPull10 ? "#f5c51888" : "#2a2010"}`,
+                    background: canPull10 ? "linear-gradient(135deg,#2a1608,#4a2808)" : "#0d0b08",
+                    color: canPull10 ? "#f5c518" : "#4a3a5a", fontSize: 14, fontWeight: "bold",
+                    cursor: canPull10 ? "pointer" : "not-allowed",
+                    boxShadow: canPull10 ? "0 0 24px #f5c51822" : "none",
+                    transition: "all 0.2s",
+                  }}
+                  onClick={() => canPull10 && performPull(activeBanner, 10)}
+                  disabled={!canPull10}
+                >
+                  <div style={{ fontSize: 20, marginBottom: 2 }}>✨</div>
+                  <div>Summon ×10</div>
+                  <div style={{ fontSize: 11, opacity: 0.75, marginTop: 2 }}>{GACHA_PULL_COST * 10} Shards</div>
+                </button>
+              </div>
+
+              {/* Rates card */}
+              <div style={{ background: "#0d0b08", border: "1px solid #2a2010", borderRadius: 10, padding: "10px 14px" }}>
+                <div style={{ fontSize: 10, color: "#6a5a3a", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>Drop Rates</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {Object.entries(RARITY_RATES).map(([r, pct]) => (
+                    <div key={r} style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 5, background: RARITY_COLORS[r] + "15", border: `1px solid ${RARITY_COLORS[r]}44` }}>
+                      <span style={{ fontSize: 10, fontWeight: "bold", color: RARITY_COLORS[r] }}>{r}</span>
+                      <span style={{ fontSize: 11, color: RARITY_COLORS[r] + "cc" }}>{pct}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 9, color: "#5a4a2a", marginTop: 8 }}>
+                  Guaranteed Rare+ every {GACHA_PITY_RARE} pulls · Legendary guaranteed by pull {GACHA_PITY_LEGEND}
+                </div>
+                <div style={{ fontSize: 9, color: "#5a4a4a", marginTop: 3 }}>
+                  Duplicate heroes convert to 🌌 Void Dust · Duplicate spirits also convert
+                </div>
+              </div>
+
+              {/* Pull history */}
+              {pullHistory.length > 0 && (
+                <div style={{ background: "#0d0b08", border: "1px solid #1e1810", borderRadius: 10, padding: "10px 14px" }}>
+                  <div style={{ fontSize: 10, color: "#6a5a3a", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>Recent Pulls</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {pullHistory.slice(0, 20).map((p, i) => (
+                      <div key={i} title={`${p.name} (${p.rarity})`} style={{
+                        width: 28, height: 28, borderRadius: 6, fontSize: 14,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        background: (RARITY_COLORS[p.rarity] || "#888") + "22",
+                        border: `1px solid ${RARITY_COLORS[p.rarity] || "#888"}55`,
+                        boxShadow: p.rarity === "Legendary" ? `0 0 8px ${RARITY_COLORS.Legendary}88` : "none",
+                      }}>
+                        {p.emoji}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Collection preview */}
+              <div style={{ background: "#0d0b08", border: "1px solid #1e1810", borderRadius: 10, padding: "10px 14px" }}>
+                <div style={{ fontSize: 10, color: "#6a5a3a", letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }}>
+                  {activeBanner === "hero" ? "Hero Collection" : "Spirit Collection"} · {
+                    activeBanner === "hero"
+                      ? `${HERO_BANNER_POOL.filter(h => (heroLevels[h.id]||0)>0).length}/${HERO_BANNER_POOL.length}`
+                      : `${SPIRIT_EGG_POOL.filter(p => petOwned[p.id]).length}/${SPIRIT_EGG_POOL.length}`
+                  }
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {(activeBanner === "hero" ? HERO_BANNER_POOL : SPIRIT_EGG_POOL).map(item => {
+                    const heroData = activeBanner === "hero" ? HEROES.find(h => h.id === item.id) : null;
+                    const owned = activeBanner === "hero" ? (heroLevels[item.id]||0)>0 : !!petOwned[item.id];
+                    const emoji = heroData ? heroData.emoji : item.emoji;
+                    const name  = heroData ? heroData.name  : item.name;
+                    const rc    = RARITY_COLORS[item.rarity] || "#888";
+                    return (
+                      <div key={item.id} title={`${name} · ${item.rarity}`} style={{
+                        width: 44, height: 54, borderRadius: 8, fontSize: 22,
+                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+                        background: owned ? rc + "18" : "#0a0808",
+                        border: `1px solid ${owned ? rc + "55" : "#1a1810"}`,
+                        opacity: owned ? 1 : 0.35,
+                        boxShadow: owned && item.rarity === "Legendary" ? `0 0 10px ${rc}44` : "none",
+                      }}>
+                        {emoji}
+                        <span style={{ fontSize: 7, color: rc, fontWeight: "bold", letterSpacing: 0.5 }}>
+                          {item.rarity.slice(0,1)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+          );
+        })()}
+
       </div>
 
       {/* NAV */}
       <nav style={S.nav}>
         {[
-          { id: "battle",     emoji: "⚔️",  label: "Battle",  badge: 0 },
-          { id: "gear",       emoji: "🎒",  label: "Gear",    badge: newLootCount },
-          { id: "lore",       emoji: "🗺️",  label: "Map",     badge: 0 },
-          { id: "companions", emoji: "👥",  label: "Allies",  badge: 0 },
-          { id: "shop",       emoji: "🏪",  label: "City",    badge: 0 },
-          { id: "stats",      emoji: "📊",  label: "Stats",   badge: newAchievementCount },
+          { id: "battle",     emoji: "⚔️",  label: "Battle", badge: 0 },
+          { id: "gear",       emoji: "🎒",  label: "Gear",   badge: newLootCount },
+          { id: "lore",       emoji: "🗺️",  label: "Map",    badge: 0 },
+          { id: "companions", emoji: "👥",  label: "Allies", badge: 0 },
+          { id: "pets",       emoji: "🐾",  label: "Pets",   badge: newPetCount },
+          { id: "summon",     emoji: "🌑",  label: "Summon", badge: 0 },
+          { id: "shop",       emoji: "🏪",  label: "City",   badge: 0 },
+          { id: "stats",      emoji: "📊",  label: "Stats",  badge: newAchievementCount },
         ].map(t => (
           <button key={t.id}
-            style={{ ...S.navBtn, ...(tab === t.id ? S.navBtnActive : {}), position: "relative", padding: "8px 0 10px" }}
+            style={{ ...S.navBtn, ...(tab === t.id ? S.navBtnActive : {}), position: "relative", padding: "7px 0 9px" }}
             onClick={() => {
               setTab(t.id);
               if (t.id === "gear")  setNewLootCount(0);
               if (t.id === "stats") setNewAchievementCount(0);
+              if (t.id === "pets")  setNewPetCount(0);
             }}>
-            <span style={{ ...S.navEmoji, fontSize: 16 }}>{t.emoji}</span>
-            <span style={{ ...S.navLabel, fontSize: 8 }}>{t.label}</span>
+            <span style={{ ...S.navEmoji, fontSize: 15 }}>{t.emoji}</span>
+            <span style={{ ...S.navLabel, fontSize: 7 }}>{t.label}</span>
             {t.badge > 0 && (
-              <span style={{ position: "absolute", top: 5, right: "50%", transform: "translateX(10px)", minWidth: 14, height: 14, background: "#cc2200", borderRadius: 7, fontSize: 9, fontWeight: "bold", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+              <span style={{ position: "absolute", top: 4, right: "50%", transform: "translateX(10px)", minWidth: 13, height: 13, background: "#cc2200", borderRadius: 7, fontSize: 8, fontWeight: "bold", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
                 {t.badge}
               </span>
             )}
           </button>
         ))}
       </nav>
+
+      {/* ── SUMMON REVEAL MODAL ── */}
+      {summonModal && (() => {
+        const { phase, banner, results, revealIdx } = summonModal;
+        const RARITY_COLORS = { Common:"#8a8a8a", Rare:"#3a8aee", Epic:"#9944dd", Legendary:"#f5c518" };
+        const RARITY_GLOW   = { Common:"#8a8a8a33", Rare:"#3a8aee55", Epic:"#9944dd66", Legendary:"#f5c518aa" };
+        const hasLegendary  = results.some(r => r.rarity === "Legendary");
+        const currentCard   = phase === "revealing" && revealIdx < results.length ? results[revealIdx] : null;
+        const isLegendaryMoment = currentCard?.rarity === "Legendary";
+        const is10Pull      = results.length === 10;
+        const heroData      = (r) => banner === "hero" ? HEROES.find(h => h.id === r.id) : null;
+        const getEmoji      = (r) => heroData(r)?.emoji ?? r.emoji;
+        const getName       = (r) => heroData(r)?.name  ?? r.name;
+
+        return (
+          <div
+            style={{
+              position: "fixed", inset: 0, zIndex: 300,
+              background: isLegendaryMoment
+                ? "radial-gradient(ellipse at center, #1a0a0022 0%, #000000ff 100%)"
+                : "rgba(0,0,0,0.92)",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              transition: "background 0.6s ease",
+            }}
+            onClick={() => {
+              // Allow tap-to-skip through cards
+              if (phase === "revealing" && revealIdx < results.length) {
+                setSummonModal(m => m ? { ...m, revealIdx: results.length } : null);
+              } else if (phase === "done") {
+                setSummonModal(null);
+              }
+            }}
+          >
+            {/* ── PORTAL PHASE ── */}
+            {phase === "portal" && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ position: "relative", width: 160, height: 160, margin: "0 auto 24px" }}>
+                  <div className="summon-portal-outer" style={{
+                    position: "absolute", inset: 0, borderRadius: "50%",
+                    background: hasLegendary
+                      ? "radial-gradient(circle, #f5c51822 0%, #aa5500cc 40%, transparent 70%)"
+                      : "radial-gradient(circle, #cc88ff22 0%, #4a10cccc 40%, transparent 70%)",
+                    border: `3px solid ${hasLegendary ? "#f5c518" : "#aa55ff"}`,
+                    boxShadow: hasLegendary
+                      ? "0 0 40px #f5c518aa, 0 0 80px #f5c51844, inset 0 0 40px #aa550044"
+                      : "0 0 40px #aa55ffaa, 0 0 80px #7722ff44, inset 0 0 40px #3300aa44",
+                  }} />
+                  <div className="summon-portal-inner" style={{
+                    position: "absolute", inset: 20, borderRadius: "50%",
+                    background: hasLegendary
+                      ? "radial-gradient(circle, #f5c51844, #aa550088)"
+                      : "radial-gradient(circle, #cc88ff44, #7722cc88)",
+                    border: `2px solid ${hasLegendary ? "#f5c51888" : "#cc88ff88"}`,
+                  }} />
+                  <div style={{
+                    position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 52,
+                  }}>
+                    {hasLegendary ? "🌟" : banner === "hero" ? "⚔️" : "🥚"}
+                  </div>
+                </div>
+                <div style={{
+                  fontSize: hasLegendary ? 18 : 15,
+                  fontWeight: "bold",
+                  color: hasLegendary ? "#f5c518" : "#cc88ff",
+                  letterSpacing: hasLegendary ? 3 : 2,
+                  textTransform: "uppercase",
+                  textShadow: hasLegendary ? "0 0 20px #f5c518" : "0 0 12px #cc88ff",
+                  marginBottom: 8,
+                }}>
+                  {hasLegendary ? "✦ Something Awakens... ✦" : "Summoning..."}
+                </div>
+                {hasLegendary && (
+                  <div style={{ fontSize: 11, color: "#f5c51888", letterSpacing: 2, animation: "portalPulseText 0.8s ease-in-out infinite" }}>
+                    LEGENDARY DETECTED
+                  </div>
+                )}
+                <div style={{ marginTop: 20, fontSize: 9, color: "#4a3a5a" }}>Portal opening...</div>
+              </div>
+            )}
+
+            {/* ── REVEALING PHASE ── */}
+            {(phase === "revealing" || phase === "done") && (() => {
+              const revealed = results.slice(0, revealIdx);
+
+              return (
+                <div style={{ width: "100%", maxWidth: 420, padding: "0 16px" }}>
+                  {/* Legendary flash overlay */}
+                  {isLegendaryMoment && (
+                    <div className="legendary-flash" style={{
+                      position: "fixed", inset: 0, zIndex: -1,
+                      background: "radial-gradient(ellipse at center, #f5c51811 0%, transparent 70%)",
+                      pointerEvents: "none",
+                    }} />
+                  )}
+
+                  {/* Cards grid */}
+                  {is10Pull ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", marginBottom: 16 }}>
+                      {results.map((r, i) => {
+                        const isRevealed  = i < revealIdx;
+                        const isCurrent   = i === revealIdx - 1;
+                        const rColor      = RARITY_COLORS[r.rarity] || "#888";
+                        const isLegend    = r.rarity === "Legendary";
+                        return (
+                          <div
+                            key={i}
+                            className={isRevealed ? (isLegend && isCurrent ? "legendary-reveal" : "card-flip") : ""}
+                            style={{
+                              width: 68, height: 84, borderRadius: 10,
+                              background: isRevealed
+                                ? (isLegend ? "linear-gradient(145deg,#2a1a00,#4a3000)" : `linear-gradient(145deg,${rColor}18,${rColor}08)`)
+                                : "#1a1410",
+                              border: `2px solid ${isRevealed ? rColor : "#2a2010"}`,
+                              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                              gap: 3, opacity: isRevealed ? 1 : 0.35, transition: "opacity 0.2s",
+                              boxShadow: isRevealed && isLegend ? `0 0 16px ${rColor}88, 0 0 32px ${rColor}44` : "none",
+                            }}
+                          >
+                            {isRevealed ? (
+                              <>
+                                <span style={{ fontSize: 26 }}>{getEmoji(r)}</span>
+                                <span style={{ fontSize: 8, fontWeight: "bold", color: rColor, textAlign: "center", lineHeight: 1.2, padding: "0 3px" }}>
+                                  {getName(r).length > 12 ? getName(r).slice(0, 11) + "…" : getName(r)}
+                                </span>
+                                <span style={{ fontSize: 7, color: rColor + "cc", letterSpacing: 0.5 }}>{r.rarity}</span>
+                                {r.isNew && <span style={{ fontSize: 7, color: "#44cc88", fontWeight: "bold" }}>NEW</span>}
+                              </>
+                            ) : (
+                              <span style={{ fontSize: 22, opacity: 0.3 }}>❓</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* Single pull — large center card */
+                    <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+                      {revealIdx > 0 && results[0] && (() => {
+                        const r      = results[0];
+                        const rColor = RARITY_COLORS[r.rarity] || "#888";
+                        const isLeg  = r.rarity === "Legendary";
+                        return (
+                          <div
+                            className={isLeg ? "legendary-reveal" : "card-flip"}
+                            style={{
+                              width: 160, height: 200, borderRadius: 20,
+                              background: isLeg
+                                ? "linear-gradient(145deg,#3a2200,#6a4000)"
+                                : `linear-gradient(145deg,${rColor}22,${rColor}08)`,
+                              border: `3px solid ${rColor}`,
+                              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                              gap: 8,
+                              boxShadow: `0 0 30px ${RARITY_GLOW[r.rarity]}, 0 0 60px ${RARITY_GLOW[r.rarity]}`,
+                            }}
+                          >
+                            <span style={{ fontSize: 56 }}>{getEmoji(r)}</span>
+                            <div style={{ textAlign: "center", padding: "0 10px" }}>
+                              <div style={{ fontSize: 14, fontWeight: "bold", color: rColor, marginBottom: 4 }}>{getName(r)}</div>
+                              <div style={{ fontSize: 11, padding: "2px 10px", borderRadius: 5, background: rColor + "22", color: rColor, fontWeight: "bold", display: "inline-block" }}>{r.rarity}</div>
+                              {r.isNew && <div style={{ fontSize: 11, color: "#44cc88", fontWeight: "bold", marginTop: 6 }}>✦ NEW UNLOCK ✦</div>}
+                              {!r.isNew && <div style={{ fontSize: 10, color: "#6a5a4a", marginTop: 4 }}>Duplicate → Void Dust</div>}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Legendary big reveal banner */}
+                  {isLegendaryMoment && (
+                    <div className="legendary-banner" style={{
+                      textAlign: "center", marginBottom: 12,
+                    }}>
+                      <div style={{ fontSize: 28, fontWeight: "bold", color: "#f5c518", letterSpacing: 4, textTransform: "uppercase", textShadow: "0 0 30px #f5c518, 0 0 60px #f5c518aa", marginBottom: 4 }}>
+                        ✦ LEGENDARY ✦
+                      </div>
+                      <div style={{ fontSize: 15, color: "#e8c888", letterSpacing: 1 }}>
+                        {getName(currentCard)} appears!
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Phase done — summary */}
+                  {phase === "done" && (
+                    <div style={{ textAlign: "center", marginTop: 8 }}>
+                      {results.some(r => r.rarity === "Legendary") && (
+                        <div style={{ fontSize: 13, color: "#f5c518", fontWeight: "bold", marginBottom: 8, textShadow: "0 0 12px #f5c51888" }}>
+                          ✦ LEGENDARY ACQUIRED ✦
+                        </div>
+                      )}
+                      <div style={{ fontSize: 11, color: "#6a5a4a", marginBottom: 16 }}>
+                        {(() => {
+                          const newCount = results.filter(r => r.isNew).length;
+                          if (newCount === 0) return "All duplicates — Void Dust awarded.";
+                          const word = banner === "hero"
+                            ? (newCount > 1 ? "heroes" : "hero")
+                            : (newCount > 1 ? "spirits" : "spirit");
+                          return `${newCount} new ${word} unlocked!`;
+                        })()}
+                      </div>
+                      <button
+                        style={{
+                          padding: "12px 40px", borderRadius: 12, border: "2px solid #7a40cc",
+                          background: "linear-gradient(135deg,#1a0840,#2a1060)",
+                          color: "#e0c8ff", fontSize: 14, fontWeight: "bold", fontFamily: "inherit",
+                          cursor: "pointer", letterSpacing: 1,
+                        }}
+                        onClick={(e) => { e.stopPropagation(); setSummonModal(null); }}
+                      >
+                        Continue
+                      </button>
+                      {revealIdx < results.length ? null : (
+                        <div style={{ fontSize: 9, color: "#3a2a4a", marginTop: 8 }}>Tap anywhere to close</div>
+                      )}
+                    </div>
+                  )}
+
+                  {phase === "revealing" && revealIdx < results.length && (
+                    <div style={{ textAlign: "center", fontSize: 9, color: "#3a2a4a", marginTop: 8 }}>
+                      {is10Pull ? `${revealIdx}/${results.length} revealed` : "Revealing..."} · Tap to skip
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        );
+      })()}
 
       {/* OFFLINE MODAL */}
       {offlineModal && (
@@ -4041,6 +5284,7 @@ export default function IdleRPG() {
                     >
                       <span>{it.emoji} {it.name}</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 11, color: "#f5c518aa" }}>{starsStr(it.stars || 1)}</span>
                         <RarityBadge rarity={ir} style={{ fontSize: 8 }} />
                         <span style={{ color: rc.color, fontWeight: "bold" }}>+{it.bonus}%</span>
                       </div>
@@ -4446,4 +5690,62 @@ const css = `
     50%     { box-shadow: 0 0 14px var(--slot-color, #f5c51888); }
   }
   .gear-slot-equipped { animation: gearSlotGlow 2.5s ease-in-out infinite; }
+
+  @keyframes petFloat {
+    0%,100% { transform: translateY(0) rotate(0deg) scale(1); }
+    30%     { transform: translateY(-5px) rotate(-4deg) scale(1.06); }
+    70%     { transform: translateY(-3px) rotate(3deg) scale(1.04); }
+  }
+  .pet-idle {
+    animation: petFloat 2.5s ease-in-out infinite;
+    display: inline-block;
+  }
+
+  /* ── GACHA ANIMATIONS ─────────────────────────── */
+  @keyframes portalSpinOuter {
+    0%   { transform: rotate(0deg) scale(1); }
+    50%  { transform: rotate(180deg) scale(1.08); }
+    100% { transform: rotate(360deg) scale(1); }
+  }
+  @keyframes portalSpinInner {
+    0%   { transform: rotate(0deg) scale(1); }
+    100% { transform: rotate(-360deg) scale(1); }
+  }
+  .summon-portal-outer { animation: portalSpinOuter 2s linear infinite; }
+  .summon-portal-inner { animation: portalSpinInner 1.4s linear infinite; }
+
+  @keyframes cardFlip {
+    0%   { transform: rotateY(90deg) scale(0.85); opacity: 0; }
+    55%  { transform: rotateY(-8deg) scale(1.04); opacity: 1; }
+    100% { transform: rotateY(0deg) scale(1); opacity: 1; }
+  }
+  .card-flip { animation: cardFlip 0.38s cubic-bezier(0.175,0.885,0.32,1.275) forwards; }
+
+  @keyframes legendaryReveal {
+    0%   { transform: scale(0.4) rotateY(90deg); opacity: 0; filter: brightness(3); }
+    40%  { transform: scale(1.18) rotateY(-6deg); opacity: 1; filter: brightness(2); }
+    70%  { transform: scale(0.96) rotateY(2deg); filter: brightness(1.4); }
+    100% { transform: scale(1) rotateY(0deg); opacity: 1; filter: brightness(1); }
+  }
+  .legendary-reveal { animation: legendaryReveal 0.85s cubic-bezier(0.175,0.885,0.32,1.275) forwards; }
+
+  @keyframes legendaryFlashBg {
+    0%   { opacity: 0; }
+    20%  { opacity: 1; }
+    100% { opacity: 0.6; }
+  }
+  .legendary-flash { animation: legendaryFlashBg 0.5s ease forwards; }
+
+  @keyframes legendaryBannerIn {
+    0%   { transform: translateY(20px) scale(0.9); opacity: 0; }
+    60%  { transform: translateY(-4px) scale(1.02); }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  .legendary-banner { animation: legendaryBannerIn 0.6s cubic-bezier(0.175,0.885,0.32,1.275) forwards; }
+
+  @keyframes portalPulseText {
+    0%,100% { opacity: 0.5; letter-spacing: 2px; }
+    50%     { opacity: 1;   letter-spacing: 4px; }
+  }
+
 `;
