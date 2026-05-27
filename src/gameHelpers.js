@@ -154,7 +154,7 @@ function getEnemyForZone(zone, rebirthMult = 1) {
     const slime = ENEMIES[0];
     const scale = Math.pow(1.4, zone - 1);
     if (Math.random() < 0.001) {
-      const goblin = ENEMIES[1];
+      const goblin = ENEMIES.find(e => e.id === "goblin");
       return { ...goblin, name: "Lost Goblin", maxHp: Math.floor(goblin.baseHp * scale), goldReward: Math.floor(goblin.baseGold * scale * 3) };
     }
     return { ...slime, maxHp: Math.floor(slime.baseHp * scale), goldReward: Math.floor(slime.baseGold * scale) };
